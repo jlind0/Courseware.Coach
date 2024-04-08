@@ -19,6 +19,8 @@ using Stripe;
 using Stripe.Checkout;
 using Courseware.Coach.LLM.Core;
 using Courseware.Coach.LLM;
+using Courseware.Coach.ViewModels;
+using Courseware.Coach.Web.Pages;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -55,6 +57,9 @@ builder.Services.AddSingleton<ISubscriptionManager, SubscriptionManager>();
 builder.Services.AddSingleton<ICloneAI, CloneAI>();
 builder.Services.AddSingleton<ITTS, TTS>();
 builder.Services.AddSingleton<ITranslationService, TranslationService>();
+builder.Services.AddTransient<AlertView.AlertViewModel>();
+builder.Services.AddTransient<ClonesViewModel>();
+builder.Services.AddTransient<CoachesViewModel>();
 builder.Services.AddLogging();
 builder.Services.AddSession();
 var app = builder.Build();

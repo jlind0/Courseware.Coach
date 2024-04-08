@@ -1,4 +1,5 @@
-﻿<div class="top-row ps-3 navbar navbar-dark">
+﻿@inject AuthenticationStateProvider AuthState
+<div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
         <a class="navbar-brand" href="">Courseware.Coach.Web</a>
         <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
@@ -14,15 +15,24 @@
                 <span class="oi oi-home" aria-hidden="true"></span> Home
             </NavLink>
         </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="counter">
-                <span class="oi oi-plus" aria-hidden="true"></span> Counter
-            </NavLink>
-        </div>
+        @if(isAdmin)
+        {
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="/admin/clones">
+                    <span aria-hidden="true"><i class="fa-solid fa-clone"></i></span> Clones
+                </NavLink>
+            </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="/admin/coaches">
+                    <span aria-hidden="true"><i class="fa-solid fa-person-chalkboard"></i></span> Coaches
+                </NavLink>
+            </div>
+        }
     </nav>
 </div>
 
 @code {
+    private bool isAdmin = true;
     private bool collapseNavMenu = true;
 
     private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
@@ -30,5 +40,11 @@
     private void ToggleNavMenu()
     {
         collapseNavMenu = !collapseNavMenu;
+    }
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthState.GetAuthenticationStateAsync();
+        //isAdmin = authState.User.IsInRole("Admin");
+        await base.OnInitializedAsync();
     }
 }

@@ -69,12 +69,9 @@ namespace Courseware.Coach.Core
         public string Description { get; set; } = null!;
         [Required]
         public string APIKey { get; set; } = null!;
-        public string? Purpose { get; set; }
-        public string? Personality { get; set; }
         [Required]
         public string Slug { get; set; } = null!;
         public List<CoachInstance> Instances { get; set; } = [];
-        public bool RequiresSubscription { get; set; } = true;
         public int DaysToComplete { get; set; } = 90;
         public string NativeLocale { get; set; } = "en-US";
         public string? DefaultVoiceName { get; set; }
@@ -91,7 +88,6 @@ namespace Courseware.Coach.Core
         public string Name { get; set; } = null!;
         [Required]
         public string Slug { get; set; } = null!;
-        public bool RequiresSubscription { get; set; } = true;
         public int DaysToComplete { get; set; } = 90;
         public string NativeLocale { get; set; } = "en-US";
         public string? DefaultVoiceName { get; set; }
@@ -108,7 +104,6 @@ namespace Courseware.Coach.Core
         public Lesson[] Lessons { get; set; } = [];
         [Required]
         public decimal? Price { get; set; }
-        public bool RequiresSubscription { get; set; } = true;
         public int DaysToComplete { get; set; } = 90;
         public string? StripeProductId { get; set; }
         public string? StripePriceId { get; set; }

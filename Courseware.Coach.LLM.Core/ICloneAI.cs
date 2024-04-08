@@ -55,6 +55,10 @@ namespace Courseware.Coach.LLM.Core
         public string text { get; set; } = null!;
         public string @type { get; set; } = null!;
     }
+    public class CloneBody
+    {
+        public Clone clone { get; set; } = null!;
+    }
     public class Clone
     {
         public string name { get; set; } = null!;

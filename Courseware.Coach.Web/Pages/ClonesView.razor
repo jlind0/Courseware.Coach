@@ -1,0 +1,34 @@
+﻿@page "/admin/clones"
+@using Courseware.Coach.LLM.Core
+@inherits ReactiveInjectableComponentBase<ClonesViewModel>
+@if(ViewModel != null)
+{
+    <AlertView Alert="ViewModel.Alert"/>
+    <h2>Registered Clones</h2>
+    <TelerikGrid Data="@ViewModel.Clones">
+        <GridColumns>
+            <GridColumn Field="@(nameof(Clone.name))" Title="Name" />
+            <GridColumn Field="@(nameof(Clone.description))" Title="Email" />
+            <GridColumn Field="@(nameof(Clone.slug))" Title="Slug" />
+            <GridColumn Field="@(nameof(Clone.phone))" Title="Phone" />
+            <GridColumn Field="@nameof(Clone.personality)" Title="Personality" />
+            <GridColumn Field="@nameof(Clone.purpose)" Title="Purpose" />
+            <GridColumn Title="Image">
+                <Template>
+                    @if(!string.IsNullOrWhiteSpace(((Clone)context).image_url))
+                    {
+                        <img src="@(((Clone)context).image_url)" alt="@(((Clone)context).name)" />
+                    }
+                </Template>
+            </GridColumn>
+        </GridColumns>
+    </TelerikGrid>
+}
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        if (ViewModel != null)
+            await ViewModel.Load.Execute().GetAwaiter();
+        await base.OnInitializedAsync();
+    }
+}

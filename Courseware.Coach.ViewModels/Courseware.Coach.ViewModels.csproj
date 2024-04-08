@@ -13,6 +13,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Courseware.Coach.Core\Courseware.Coach.Core.csproj" />
     <ProjectReference Include="..\Courseware.Coach.Data.Core\Courseware.Coach.Data.Core.csproj" />
+    <ProjectReference Include="..\Courseware.Coach.Data\Courseware.Coach.Data.csproj" />
     <ProjectReference Include="..\Courseware.Coach.LLM.Core\Courseware.Coach.LLM.Core.csproj" />
   </ItemGroup>
 

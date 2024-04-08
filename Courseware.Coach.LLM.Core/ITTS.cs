@@ -11,5 +11,6 @@ namespace Courseware.Coach.LLM.Core
     {
         Task<VoiceInfo[]> GetVoices(string locale = "en-US", CancellationToken token = default);
         Task<byte[]?> GenerateSpeech(string text, string voiceName, string locale = "en-US", CancellationToken token = default);
+        Task<string[]> GetLocales(CancellationToken token = default);
     }
 }

@@ -3,6 +3,7 @@ using Microsoft.Azure.Cosmos.Serialization.HybridRow;
 using Microsoft.CognitiveServices.Speech;
 using Microsoft.Extensions.Configuration;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -46,6 +47,27 @@ namespace Courseware.Coach.LLM
                 voices.AddRange(result.Voices.ToArray());
                 return voices.ToArray();
             }
+        }
+        protected ConcurrentBag<string> Locales { get; } = new ConcurrentBag<string>();
+        private readonly object lock_sync = new object();
+        public async Task<string[]> GetLocales(CancellationToken token = default)
+        {
+            if (Locales.Count == 0)
+            {
+                var config = GetConfig();
+                using (var speech = new SpeechSynthesizer(config))
+                {
+                    var voices = await speech.GetVoicesAsync();
+                    lock (lock_sync)
+                    {
+                        Locales.Clear();
+                        foreach (var v in voices.Voices.DistinctBy(v => v.Locale).Select(v => v.Locale))
+                            Locales.Add(v);
+                    }
+
+                }
+            }
+            return Locales.ToArray();
         }
     }
 }

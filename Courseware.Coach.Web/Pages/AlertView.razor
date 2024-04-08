@@ -1,0 +1,57 @@
+﻿@inherits ReactiveInjectableComponentBase<AlertView.AlertViewModel>
+@if (ViewModel != null)
+{
+    <TelerikDialog Title="Alert" @ref="dialog" @bind-Visible="ViewModel.IsOpen">
+        <DialogContent>
+            @ViewModel.Message
+        </DialogContent>
+    </TelerikDialog>
+}
+@code {
+    public class AlertViewModel : ReactiveObject
+    {
+        public void LoadAlertView(AlertView view)
+        {
+            view.Alert.RegisterHandler(async msg =>
+           {
+               Message = msg.Input;
+               IsOpen = true;
+
+               await slim.WaitAsync();
+               msg.SetOutput(true);
+
+           });
+        }
+        SemaphoreSlim slim = new SemaphoreSlim(0);
+        private bool isOpen;
+        public bool IsOpen
+        {
+            get => isOpen;
+            set
+            {
+                this.RaiseAndSetIfChanged(ref isOpen, value);
+                if (!value)
+                    slim.Release();
+            }
+        }
+        private string message = null!;
+        public string Message
+        {
+            get => message;
+            set => this.RaiseAndSetIfChanged(ref message, value);
+        }
+    }
+    protected TelerikDialog dialog = null!;
+
+    private Interaction<string, bool> alert;
+    [Parameter]
+    public Interaction<string, bool> Alert
+    {
+        get => alert;
+        set
+        {
+            alert = value;
+            ViewModel?.LoadAlertView(this);
+        }
+    }
+}

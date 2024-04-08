@@ -1,0 +1,44 @@
+﻿@page "/admin/coaches"
+@using CH = Courseware.Coach.Core.Coach
+@inject NavigationManager Nav
+@inherits ReactiveInjectableComponentBase<CoachesViewModel>
+
+@if(ViewModel != null)
+{
+    <AlertView Alert="ViewModel.Alert"/>
+    <h3>Coaches <AddCoachView ViewModel="ViewModel.AddViewModel" /></h3>
+    <TelerikGrid @ref="grdRef" TItem="CH" Sortable="true" FilterMode="GridFilterMode.FilterMenu"
+        OnRead="ViewModel.Load.BindReadCommand<CH>(this)">
+            <GridColumns>
+                <GridColumn Field="@nameof(CH.Name)" Title="Name"/>
+                <GridColumn Field="@nameof(CH.Slug)" Title="Slug" />
+                <GridColumn Field="@nameof(CH.Price)" Title="Price" />
+                <GridColumn Field="@nameof(CH.NativeLocale)" Title="Native Locale" />  
+                <GridColumn Field="@nameof(CH.DefaultVoiceName)" Title="Default Voice Name" />
+                <GridColumn Field="@nameof(CH.Id)" Title="Open">
+                    <Template>
+                        <TelerikButton OnClick="() => Redirect(((CH)context).Id)">(...)</TelerikButton>
+                    </Template>
+                </GridColumn>
+            </GridColumns>
+        </TelerikGrid>
+}
+@code {
+    protected TelerikGrid<CH> grdRef = null!;
+    protected void Reload()
+    {
+        grdRef?.Rebind();
+    }
+    protected void Redirect(Guid id)
+    {
+        Nav.NavigateTo($"/admin/coaches/{id}");
+    }
+    protected override async Task OnInitializedAsync()
+    {
+        if (ViewModel != null)
+        {
+            ViewModel.Reload = Reload;
+        }
+        await base.OnInitializedAsync();
+    }
+}

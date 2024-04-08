@@ -1,0 +1,65 @@
+﻿@using CH = Courseware.Coach.Core.Coach
+@using Microsoft.CognitiveServices.Speech
+@inherits ReactiveComponentBase<AddCoachViewModel>
+@if (ViewModel != null)
+{
+    <AlertView Alert="ViewModel.Alert" />
+    <button class="btn btn-primary" @onclick="ViewModel.Open.BindCommand<MouseEventArgs>()"><i class="fa-solid fa-plus"></i></button>
+    <TelerikDialog @bind-Visible="ViewModel.IsOpen" Title="Add Coach">
+        <DialogContent>
+            <TelerikForm Model="ViewModel.Data" OnValidSubmit="ViewModel.Add.BindCommand<EditContext>()">
+                <FormValidation>
+                    <DataAnnotationsValidator />
+                </FormValidation>
+                <FormItems>
+                    <FormItem Field="@nameof(CH.Name)" LabelText="Name" />
+                    <FormItem Field="@nameof(CH.Description)" LabelText="Description" />
+                    <FormItem Field="@nameof(CH.Slug)" LabelText="Slug" />
+                    <FormItem Field="@nameof(CH.Price)" LabelText="Price" />
+                    <FormItem Field="@nameof(CH.DaysToComplete)" LabelText="Days to Complete" />
+                    <FormItem Field="@nameof(CH.NativeLocale)" LabelText="Native Locale">
+                        <Template>
+                            <TelerikDropDownList @bind-Value="ViewModel.SelectedLocale"
+                                                 Data="ViewModel.Locales" TItem="string" TValue="string" ValueField="ShortName">
+                                <ItemTemplate>
+                                    @context
+                                </ItemTemplate>
+                                <ValueTemplate>
+                                    @context
+                                </ValueTemplate>
+                            </TelerikDropDownList>
+                        </Template>
+                    </FormItem>
+                    <FormItem Field="@nameof(CH.DefaultVoiceName)" LabelText="Default Voice Name">
+                        <Template>
+                            <TelerikDropDownList @bind-Value="ViewModel.SelectedVoice"
+                                                 Data="ViewModel.Voices" TItem="VoiceInfo" TValue="string" ValueField="ShortName">
+                                <ItemTemplate>
+                                    @context.LocalName (@context.Locale)
+                                </ItemTemplate>
+                                <ValueTemplate>
+                                    @context.LocalName (@context.Locale)
+                                </ValueTemplate>
+                            </TelerikDropDownList>
+                        </Template>
+                    </FormItem>
+                    <FormItem Field="@nameof(CH.APIKey)" LabelText="API Key"/>
+                </FormItems>
+            </TelerikForm>
+        </DialogContent>
+        <DialogButtons>
+            <TelerikButton OnClick="ViewModel.Cancel.BindCommand<MouseEventArgs>()">Cancel</TelerikButton>
+        </DialogButtons>
+    </TelerikDialog>
+
+}
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        if(ViewModel != null)
+        {
+            await ViewModel.Load.Execute().GetAwaiter();
+        }
+        await base.OnInitializedAsync();
+    }
+}
