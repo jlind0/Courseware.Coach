@@ -1,0 +1,49 @@
+﻿@page "/admin/users"
+@inject NavigationManager Nav
+@inherits ReactiveInjectableComponentBase<UsersViewModel>
+@attribute [RoleAuthorization(Roles = "Admin")]
+@if(ViewModel != null)
+{
+    <AlertView Alert="ViewModel.Alert"/>
+    <h3>Users</h3>
+    <TelerikGrid Pageable="true" Resizable="true" PageSize="25" TItem="User" Sortable="true" FilterMode="GridFilterMode.FilterMenu"
+        OnRead="ViewModel.Load.BindReadCommand<User>(this)">
+            <GridColumns>
+                <GridColumn Field="@nameof(User.LastName)" Title="Last Name" />
+                <GridColumn Field="@nameof(User.FirstName)" Title="First Name"/>
+                <GridColumn Field="@nameof(User.Email)" Title="Email" />
+                <GridColumn Field="@nameof(User.Gender)" Title="Gender" />      
+                <GridColumn Field="@nameof(User.DateOfBirth)" Title="Date of Birth" />
+                <GridColumn Field="@nameof(User.PhoneNumber)" Title="Phone" />
+                <GridColumn Field="@nameof(User.Address)" Title="Address" />
+                <GridColumn Field="@nameof(User.City)" Title="City" />
+                <GridColumn Field="@nameof(User.State)" Title="State" />
+                <GridColumn Field="@nameof(User.ZipCode)" Title="ZipCode" />
+                <GridColumn Field="@nameof(User.Country)" Title="Country" />
+                <GridColumn Field="@nameof(User.Locale)" Title="Locale" />
+                <GridColumn Field="@nameof(User.DefaultVoiceName)" Title="DefaultVoiceName" />
+                <GridColumn Title="Roles">
+                    <Template>
+                        <ul>
+                        @foreach (var role in ((User)context).Roles)
+                        {
+                            <li>@role</li>
+                        }
+                        </ul>
+                    </Template>
+                </GridColumn>
+                <GridColumn Field="@nameof(User.Id)" Title="Open">
+                    <Template>
+                        <TelerikButton OnClick="() => Redirect(((User)context).Id)">(...)</TelerikButton>
+                    </Template>
+                </GridColumn>
+            </GridColumns>
+        </TelerikGrid>
+}
+
+@code {
+    protected void Redirect(Guid id)
+    {
+        Nav.NavigateTo($"/admin/users/{id}");
+    }
+}

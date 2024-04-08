@@ -40,12 +40,13 @@ namespace Courseware.Coach.Web.Controllers
                     var user = new User()
                     {
                         ObjectId = userId,
-                        FirstName = message["surname"]?.ToString(),
-                        LastName = message["givenName"]?.ToString(),
+                        LastName = message["surname"]?.ToString(),
+                        FirstName = message["givenName"]?.ToString(),
                         Email = (string)(message["email"] ?? throw new InvalidDataException()),
                         ZipCode = message["postalCode"]?.ToString(),
                         State = message["state"]?.ToString(),
                         Address = message["streetAddress"]?.ToString(),
+                        Country = message["country"]?.ToString(),
                     };
                     await UserRepo.Add(user, token: token);
                 }

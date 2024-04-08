@@ -1,6 +1,7 @@
 ﻿@page "/admin/clones"
 @using Courseware.Coach.LLM.Core
 @inherits ReactiveInjectableComponentBase<ClonesViewModel>
+@attribute [RoleAuthorization(Roles = "Admin")]
 @if(ViewModel != null)
 {
     <AlertView Alert="ViewModel.Alert"/>

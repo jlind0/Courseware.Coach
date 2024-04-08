@@ -1,7 +1,7 @@
 ﻿@inject AuthenticationStateProvider AuthState
 <div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
-        <a class="navbar-brand" href="">Courseware.Coach.Web</a>
+        <a class="navbar-brand" href="">Courseware Coach</a>
         <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
             <span class="navbar-toggler-icon"></span>
         </button>
@@ -19,12 +19,17 @@
         {
             <div class="nav-item px-3">
                 <NavLink class="nav-link" href="/admin/clones">
-                    <span aria-hidden="true"><i class="fa-solid fa-clone"></i></span> Clones
+                    <span aria-hidden="true"><i class="fa-solid fa-clone"></i></span>&nbsp;Clones
                 </NavLink>
             </div>
             <div class="nav-item px-3">
                 <NavLink class="nav-link" href="/admin/coaches">
-                    <span aria-hidden="true"><i class="fa-solid fa-person-chalkboard"></i></span> Coaches
+                    <span aria-hidden="true"><i class="fa-solid fa-person-chalkboard"></i></span>&nbsp;Coaches
+                </NavLink>
+            </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="/admin/users">
+                    <span aria-hidden="true"><i class="fa-solid fa-users"></i></span>&nbsp;Users
                 </NavLink>
             </div>
         }
@@ -32,7 +37,7 @@
 </div>
 
 @code {
-    private bool isAdmin = true;
+    private bool isAdmin = false;
     private bool collapseNavMenu = true;
 
     private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
@@ -44,7 +49,7 @@
     protected override async Task OnInitializedAsync()
     {
         var authState = await AuthState.GetAuthenticationStateAsync();
-        //isAdmin = authState.User.IsInRole("Admin");
+        isAdmin = authState.User.IsInRole("Admin");
         await base.OnInitializedAsync();
     }
 }

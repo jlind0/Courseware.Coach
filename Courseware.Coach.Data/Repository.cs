@@ -83,7 +83,7 @@ namespace Courseware.Coach.Data
             T? entity = null;
             await Use(async (w, t) =>
             {
-                entity = await w.Context.FindAsync<T>(id, t);
+                entity = await w.Context.Set<T>().Where(t => t.Id == id).FirstOrDefaultAsync(t);
                 
             }, uow, token);
             return entity;

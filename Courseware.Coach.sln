@@ -21,9 +21,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Courseware.Coach.Web", "Cou
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Courseware.Coach.ViewModels", "Courseware.Coach.ViewModels\Courseware.Coach.ViewModels.csproj", "{7CC48421-BB5E-4E1B-BA91-BF429A8E19AC}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Courseware.Coach.Subscriptions.Core", "Courseware.Coach.Subscriptions.Core\Courseware.Coach.Subscriptions.Core.csproj", "{4C7C70D8-1D52-450F-AC79-9B9D887D095D}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Courseware.Coach.Subscriptions.Core", "Courseware.Coach.Subscriptions.Core\Courseware.Coach.Subscriptions.Core.csproj", "{4C7C70D8-1D52-450F-AC79-9B9D887D095D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Courseware.Coach.Subscriptions", "Courseware.Coach.Subscriptions\Courseware.Coach.Subscriptions.csproj", "{E191DD40-7EEE-439C-97F6-86CB547FC483}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Courseware.Coach.Subscriptions", "Courseware.Coach.Subscriptions\Courseware.Coach.Subscriptions.csproj", "{E191DD40-7EEE-439C-97F6-86CB547FC483}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

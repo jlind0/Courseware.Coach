@@ -2,7 +2,7 @@
 @using CH = Courseware.Coach.Core.Coach
 @inject NavigationManager Nav
 @inherits ReactiveInjectableComponentBase<CoachesViewModel>
-
+@attribute [RoleAuthorization(Roles = "Admin")]
 @if(ViewModel != null)
 {
     <AlertView Alert="ViewModel.Alert"/>

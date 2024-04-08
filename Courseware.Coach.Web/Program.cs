@@ -60,6 +60,8 @@ builder.Services.AddSingleton<ITranslationService, TranslationService>();
 builder.Services.AddTransient<AlertView.AlertViewModel>();
 builder.Services.AddTransient<ClonesViewModel>();
 builder.Services.AddTransient<CoachesViewModel>();
+builder.Services.AddTransient<UsersViewModel>();
+builder.Services.AddTransient<UserAdminLoaderViewModel>();
 builder.Services.AddLogging();
 builder.Services.AddSession();
 var app = builder.Build();
@@ -80,10 +82,10 @@ app.UseSession();
 app.UseAuthentication();
 app.UseAuthorization();
 
-//app.UseMiddleware<RolePopulationMiddleware>();
+app.UseMiddleware<RolePopulationMiddleware>();
 
 app.MapControllers();
-//app.UseEndpoints(endpoints => endpoints.MapControllers());
+app.UseEndpoints(endpoints => endpoints.MapControllers());
 app.MapBlazorHub();
 app.MapFallbackToPage("/_Host");
 
