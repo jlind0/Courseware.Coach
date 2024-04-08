@@ -24,7 +24,11 @@ namespace Courseware.Coach.LLM
         }
         public async Task<string> Translate(string text, string fromLocale, string toLocale, CancellationToken token = default)
         {
-            string route = $"/translate?api-version=3.0&from={fromLocale.Split('-')[0]}&to={toLocale.Split('-')[0]}";
+            string from = fromLocale.Split('-')[0];
+            string to = toLocale.Split('-')[0];
+            if (from == to)
+                return text;
+            string route = $"/translate?api-version=3.0&from={from}&to={to}";
             object[] body = [new { Text = text }];
             var requestBody = JsonConvert.SerializeObject(body);
             using (var client = new HttpClient())
