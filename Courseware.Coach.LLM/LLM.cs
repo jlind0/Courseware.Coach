@@ -79,9 +79,9 @@ namespace Courseware.Coach.LLM
         }
         public bool IsLoggedIn { get => CurrentUser != null; }
 
-        protected BroadcastBlock<string> BrodcastConversation { get; }
+        protected BroadcastBlock<CloneResponse> BrodcastConversation { get; }
 
-        public ITargetBlock<string> Conversation { get => BrodcastConversation; }
+        public ITargetBlock<CloneResponse> Conversation { get => BrodcastConversation; }
 
         protected BroadcastBlock<byte[]> BrodcastAudioConversation { get; }
 
@@ -113,7 +113,7 @@ namespace Courseware.Coach.LLM
             UserRepo = userRepo;
             CoachRepo = coachRepo;
             CourseRepo = courseRepo;
-            BrodcastConversation = new BroadcastBlock<string>(null);
+            BrodcastConversation = new BroadcastBlock<CloneResponse>(null);
             BrodcastAudioConversation = new BroadcastBlock<byte[]>(null);
         }
 
@@ -134,16 +134,16 @@ namespace Courseware.Coach.LLM
 
             }, token);
             if (resp != null)
-                await PushText($"{resp.text}", CurrentCoach.NativeLocale, CurrentCoach.DefaultVoiceName, token);
+                await PushText(resp, CurrentCoach.NativeLocale, CurrentCoach.DefaultVoiceName, token);
         }
         protected ConcurrentDictionary<string, string?> DefaultVoice { get; } = new ConcurrentDictionary<string, string?>();
-        protected async Task PushText(string message, string locale, string? voiceName, CancellationToken token)
+        protected async Task PushText(CloneResponse message, string locale, string? voiceName, CancellationToken token)
         {
             
             string targetLocale = CurrentLocale ?? CurrentUser?.Locale ?? "en-US";
             
             if (targetLocale != locale)
-                message = await Translation.Translate(message, locale, targetLocale, token);
+                message.text = await Translation.Translate(message.text, locale, targetLocale, token);
             BrodcastConversation.Post(message);
             if(IsVoiceEnabled)
             {
@@ -152,7 +152,7 @@ namespace Courseware.Coach.LLM
                 {
                     _ = Task.Factory.StartNew(async () => 
                     {
-                        var audio = await TTS.GenerateSpeech(message, voiceName, targetLocale, token);
+                        var audio = await TTS.GenerateSpeech(message.text, voiceName, targetLocale, token);
                         if (audio != null)
                             BrodcastAudioConversation.Post(audio);
                     }, token);
@@ -187,7 +187,7 @@ namespace Courseware.Coach.LLM
                 }
                 , token);
             if (resp != null)
-                await PushText($"{resp.text}", CurrentCoachInstance.NativeLocale, CurrentCoachInstance.DefaultVoiceName, token);
+                await PushText(resp, CurrentCoachInstance.NativeLocale, CurrentCoachInstance.DefaultVoiceName, token);
         }
 
         public async ValueTask DisposeAsync()

@@ -25,7 +25,7 @@ namespace Courseware.Coach.LLM.Core
         bool IsLoggedIn { get; }
         string? CurrentVoiceName { get; }
         string? CurrentLocale { get; }
-        ITargetBlock<string> Conversation { get; }
+        ITargetBlock<CloneResponse> Conversation { get; }
         ITargetBlock<byte[]> AudioConversation { get; }
         Task<bool> SetLocale(string locale = "en-US", CancellationToken token = default);
         Task<bool> SetVoiceName(string voiceName, CancellationToken token = default);
