@@ -1,0 +1,19 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ReactiveUI" Version="19.6.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Courseware.Coach.Core\Courseware.Coach.Core.csproj" />
+    <ProjectReference Include="..\Courseware.Coach.Data.Core\Courseware.Coach.Data.Core.csproj" />
+    <ProjectReference Include="..\Courseware.Coach.LLM.Core\Courseware.Coach.LLM.Core.csproj" />
+  </ItemGroup>
+
+</Project>

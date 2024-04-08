@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Stripe.net" Version="43.22.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Courseware.Coach.Core\Courseware.Coach.Core.csproj" />
+    <ProjectReference Include="..\Courseware.Coach.Data.Core\Courseware.Coach.Data.Core.csproj" />
+    <ProjectReference Include="..\Courseware.Coach.Data\Courseware.Coach.Data.csproj" />
+    <ProjectReference Include="..\Courseware.Coach.Subscriptions.Core\Courseware.Coach.Subscriptions.Core.csproj" />
+  </ItemGroup>
+
+</Project>
