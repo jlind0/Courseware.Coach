@@ -17,6 +17,7 @@ using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using CH = Courseware.Coach.Core.Coach;
 
 namespace Courseware.Coach.ViewModels
 {
@@ -196,14 +197,18 @@ namespace Courseware.Coach.ViewModels
         }
         public Interaction<string, bool> Alert { get; } = new Interaction<string, bool>();
         protected IBusinessRepositoryFacade<User, UnitOfWork> UserRepository { get; }
+        protected IBusinessRepositoryFacade<CH, UnitOfWork> CoachRepository { get; }
+        protected IBusinessRepositoryFacade<Course, UnitOfWork> CourseRepostory { get; }
         protected ILogger Logger { get; }
         public ReactiveCommand<Guid, Unit> Load { get; }
         protected ITTS TTS { get; }
-        public UserAdminLoaderViewModel(IBusinessRepositoryFacade<User, UnitOfWork> userRepository, ITTS tts, ILogger<UserAdminLoaderViewModel> logger)
+        public UserAdminLoaderViewModel(IBusinessRepositoryFacade<User, UnitOfWork> userRepository, IBusinessRepositoryFacade<CH, UnitOfWork> coachRepository, IBusinessRepositoryFacade<Course, UnitOfWork> courseRepository, ITTS tts, ILogger<UserAdminLoaderViewModel> logger)
         {
             TTS = tts;
             UserRepository = userRepository;
             Logger = logger;
+            CourseRepostory = courseRepository;
+            CoachRepository = coachRepository;
             Load = ReactiveCommand.CreateFromTask<Guid>(DoLoad);
 
         }
@@ -212,7 +217,7 @@ namespace Courseware.Coach.ViewModels
             try
             {
                 Id = id;
-                ViewModel = new UserAdminViewModel(id, UserRepository, TTS, Logger);
+                ViewModel = new UserAdminViewModel(id, UserRepository, CoachRepository, CourseRepostory, TTS, Logger);
                 await ViewModel.Load.Execute().GetAwaiter();
             }
             catch (Exception ex)
@@ -224,6 +229,12 @@ namespace Courseware.Coach.ViewModels
     }
     public class UserAdminViewModel : ReactiveObject, IDisposable
     {
+        public enum RoleTypes
+        {
+            Raw,
+            Course,
+            Coach
+        }
         public Guid Id { get; }
         private User? data;
         private bool disposedValue;
@@ -238,8 +249,16 @@ namespace Courseware.Coach.ViewModels
             get => data;
             protected set => this.RaiseAndSetIfChanged(ref data, value);
         }
+        private RoleTypes roleType = RoleTypes.Raw;
+        public RoleTypes RoleType
+        {
+            get => roleType;
+            set => this.RaiseAndSetIfChanged(ref roleType, value);
+        }
         public Interaction<string, bool> Alert { get; } = new Interaction<string, bool>();
         protected IBusinessRepositoryFacade<User, UnitOfWork> UserRepository { get; }
+        protected IBusinessRepositoryFacade<CH, UnitOfWork> CoachRepository { get; }
+        protected IBusinessRepositoryFacade<Course, UnitOfWork> CourseRepository { get; }
         protected ILogger Logger { get; }
         public ReactiveCommand<Unit, Unit> Save { get; }
         public ReactiveCommand<Unit, Unit> Load { get; }
@@ -247,6 +266,20 @@ namespace Courseware.Coach.ViewModels
         public ReactiveCommand<string, Unit> RemoveRole { get; }
         public ObservableCollection<string> Locales { get; } = new ObservableCollection<string>();
         public ObservableCollection<VoiceInfo> Voices { get; } = new ObservableCollection<VoiceInfo>();
+        public ObservableCollection<CH> Coaches { get; } = new ObservableCollection<CH>();
+        private Guid? selectedCoachId;
+        public Guid? SelectedCoachId
+        {
+            get => selectedCoachId;
+            set => this.RaiseAndSetIfChanged(ref selectedCoachId, value);
+        }
+        private Guid? selectedCourseId;
+        public Guid? SelectedCourseId
+        {
+            get => selectedCourseId;
+            set => this.RaiseAndSetIfChanged(ref selectedCourseId, value);
+        }
+        public ObservableCollection<Course> Courses { get; } = new ObservableCollection<Course>();
         protected readonly CompositeDisposable disposables = new CompositeDisposable();
         public string? SelectedLocale
         {
@@ -272,11 +305,13 @@ namespace Courseware.Coach.ViewModels
             }
         }
         protected ITTS TTS { get; }
-        public UserAdminViewModel(Guid id, IBusinessRepositoryFacade<User, UnitOfWork> userRepository, ITTS tts, ILogger logger)
+        public UserAdminViewModel(Guid id, IBusinessRepositoryFacade<User, UnitOfWork> userRepository, IBusinessRepositoryFacade<CH, UnitOfWork> coachRepository, IBusinessRepositoryFacade<Course, UnitOfWork> courseRepository, ITTS tts, ILogger logger)
         {
             Id = id;
             TTS = tts;
             UserRepository = userRepository;
+            CoachRepository = coachRepository;
+            CourseRepository = courseRepository;
             Logger = logger;
             Save = ReactiveCommand.CreateFromTask(DoSave);
             Load = ReactiveCommand.CreateFromTask(DoLoad);
@@ -306,6 +341,22 @@ namespace Courseware.Coach.ViewModels
             {
                 if (Data == null)
                     throw new InvalidDataException();
+                switch (RoleType)
+                {
+                    case RoleTypes.Coach:
+                        var coach = Coaches.SingleOrDefault(c => c.Id == SelectedCoachId);
+                        if (coach == null)
+                            throw new InvalidDataException();
+                        role = $"{role}:Coach:{coach.Id}";
+                        break;
+                    case RoleTypes.Course:
+                        var course = Courses.SingleOrDefault(c => c.Id == SelectedCourseId);
+                        if (course == null)
+                            throw new InvalidDataException();
+                        role = $"{role}:Course:{course.Id}";
+                        break;
+                    default: break;
+                }
                 if (!Data.Roles.Contains(role))
                 {
                     Data.Roles.Add(role);
@@ -342,11 +393,21 @@ namespace Courseware.Coach.ViewModels
             {
                 Data = await UserRepository.Get(Id, token: token);
                 Locales.Clear();
+                Coaches.Clear();
+                SelectedCoachId = null;
+                Courses.Clear();
+                SelectedCourseId = null;
                 var locales = await TTS.GetLocales(token);
                 foreach (var locale in locales.OrderBy(c => c))
                     Locales.Add(locale);
                 if (Data == null)
                     throw new InvalidDataException();
+                var courses = await CourseRepository.Get(token: token);
+                foreach (var course in courses.Items)
+                    Courses.Add(course);
+                var coaches = await CoachRepository.Get(token: token);
+                foreach (var coach in coaches.Items)
+                    Coaches.Add(coach);
             }
             catch (Exception ex)
             {

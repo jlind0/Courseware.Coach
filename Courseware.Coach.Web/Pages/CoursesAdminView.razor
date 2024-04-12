@@ -7,17 +7,17 @@
     <AlertView Alert="ViewModel.Alert" />
     <AddCourseView ViewModel="ViewModel.AddCourseViewModel"/>
     <TelerikGrid @ref="grdRef" TItem="CourseViewModel" OnRead="ViewModel.Load.BindReadCommand<Course, CourseViewModel>(this)"
-       Sortable="true" FilterMode="GridFilterMode.FilterMenu" Pageable="true" PageSize="25">
+       Sortable="true" FilterMode="GridFilterMode.FilterMenu" Pageable="true" PageSize="25" Resizable="true">
         <GridColumns>
             <GridColumn Field="Data.Name" Title="Name"/>
-            <GridColumn Field="Coach.Name" Title="Coach">
+            <GridColumn Field="Coach.Name" Title="Coach" Filterable="false" Sortable="false">
                <Template>
                     <TelerikButton OnClick="() => RedirectCoach(((CourseViewModel)context).Coach!.Id)">
                        @(((CourseViewModel)context).Coach!.Name)
                    </TelerikButton>
                </Template>
             </GridColumn>
-            <GridColumn Field="CoachInstance.Name" Title="Instance"/>
+            <GridColumn Field="CoachInstance.Name" Title="Instance" Filterable="false" Sortable="false"/>
             <GridColumn Field="Data.Price" Title="Price"/>
             <GridColumn Field="Data.DaysToComplete" Title="Days to Complete"/>
             <GridColumn Field="Data.Id" Title="Open">

@@ -1,4 +1,5 @@
 ﻿@using Microsoft.CognitiveServices.Speech
+@using CH = Courseware.Coach.Core.Coach
 @inherits ReactiveComponentBase<UserAdminViewModel>
 @if(ViewModel != null)
 {
@@ -8,8 +9,33 @@
         
     
     <TelerikTextBox @bind-Value="ViewModel.NewRole" />
-
-    <TelerikButton OnClick="ViewModel.AddRole.BindCommand<MouseEventArgs>(ViewModel.NewRole)"><i class="fa-solid fa-plus"></i></TelerikButton>
+    <TelerikDropDownList Data="Enum.GetValues(typeof(UserAdminViewModel.RoleTypes)).Cast<UserAdminViewModel.RoleTypes>()" 
+        TItem="UserAdminViewModel.RoleTypes" TValue="UserAdminViewModel.RoleTypes" @bind-Value="ViewModel.RoleType"></TelerikDropDownList>
+        @switch (ViewModel.RoleType)
+        {
+            case UserAdminViewModel.RoleTypes.Coach:
+                <TelerikDropDownList Data="ViewModel.Coaches" TItem="CH" TValue="Guid?" @bind-Value="ViewModel.SelectedCoachId" ValueField="Id">
+                    <ItemTemplate>
+                        @context.Name
+                    </ItemTemplate>
+                    <ValueTemplate>
+                        @context.Name
+                    </ValueTemplate>
+               </TelerikDropDownList>
+            break;
+            case UserAdminViewModel.RoleTypes.Course:
+                    <TelerikDropDownList Data="ViewModel.Courses" TItem="Course" TValue="Guid?" @bind-Value="ViewModel.SelectedCourseId" ValueField="Id">
+                        <ItemTemplate>
+                            @context.Name
+                        </ItemTemplate>
+                        <ValueTemplate>
+                            @context.Name
+                        </ValueTemplate>
+                    </TelerikDropDownList>
+            break;
+            default: break;
+        }
+        <TelerikButton OnClick="ViewModel.AddRole.BindCommand<MouseEventArgs>(ViewModel.NewRole)"><i class="fa-solid fa-plus"></i></TelerikButton>
     <TelerikForm Model="ViewModel.Data" OnValidSubmit="ViewModel.Save.BindCommand<EditContext>()">
         <FormValidation>
             <DataAnnotationsValidator />

@@ -50,7 +50,7 @@ namespace Courseware.Coach.Web.Authorization
                 return;
             }
 
-            var hasAllRequredClaims = _roles.All(r => context.HttpContext.User.IsInRole(r));
+            var hasAllRequredClaims = _roles.Any(r => context.HttpContext.User.IsInRole(r));
             if (!hasAllRequredClaims)
             {
                 context.Result = new ForbidResult();

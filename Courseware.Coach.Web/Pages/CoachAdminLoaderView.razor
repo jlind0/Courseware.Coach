@@ -1,6 +1,6 @@
 ﻿@page "/admin/coaches/{CoachId:guid}"
+@inject AuthenticationStateProvider AuthState
 @inherits ReactiveInjectableComponentBase<CoachLoaderViewModel>
-@attribute [RoleAuthorization(Roles = "Admin")]
 @if (ViewModel != null)
 {
     <AlertView Alert="ViewModel.Alert" />
@@ -11,6 +11,12 @@
     [Parameter] public Guid CoachId { get; set; }
     protected override async Task OnInitializedAsync()
     {
+        var authState = await AuthState.GetAuthenticationStateAsync();
+        bool isAuthed = authState.User?.IsInRole("Admin") == true || authState.User?.IsInRole($"Admin:Coach:{CoachId}") == true;
+        if(!isAuthed)
+        {
+            throw new UnauthorizedAccessException();
+        }
         if (ViewModel != null)
         {
             await ViewModel.Load.Execute(CoachId).GetAwaiter();

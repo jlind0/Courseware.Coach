@@ -45,6 +45,7 @@ namespace Courseware.Coach.Web.Controllers
                         Email = (string)(message["email"] ?? throw new InvalidDataException()),
                         ZipCode = message["postalCode"]?.ToString(),
                         State = message["state"]?.ToString(),
+                        City = message["city"]?.ToString(),
                         Address = message["streetAddress"]?.ToString(),
                         Country = message["country"]?.ToString(),
                     };
