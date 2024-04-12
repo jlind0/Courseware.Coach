@@ -1,4 +1,5 @@
-﻿using Courseware.Coach.Core;
+﻿using Courseware.Coach.Business.Core;
+using Courseware.Coach.Core;
 using Courseware.Coach.Data;
 using Courseware.Coach.Data.Core;
 using Courseware.Coach.LLM.Core;
@@ -27,10 +28,10 @@ namespace Courseware.Coach.ViewModels
     {
         protected ICloneAI CloneAI { get; }
         public Interaction<string, bool> Alert { get; } = new Interaction<string, bool>();
-        protected IRepository<UnitOfWork, CH> CoachRepository { get; }
+        protected IBusinessRepositoryFacade<CH, UnitOfWork> CoachRepository { get; }
         public ObservableCollection<Clone> Clones { get; } = new ObservableCollection<Clone>();
         public ReactiveCommand<Unit, Unit> Load { get; }
-        public ClonesViewModel(ICloneAI cloneAI, IRepository<UnitOfWork, CH> coachRepository)
+        public ClonesViewModel(ICloneAI cloneAI, IBusinessRepositoryFacade<CH, UnitOfWork> coachRepository)
         {
             CloneAI = cloneAI;
             CoachRepository = coachRepository;

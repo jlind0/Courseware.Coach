@@ -1,4 +1,5 @@
-﻿using Courseware.Coach.Core;
+﻿using Courseware.Coach.Business.Core;
+using Courseware.Coach.Core;
 using Courseware.Coach.Data;
 using Courseware.Coach.Data.Core;
 using Courseware.Coach.LLM.Core;
@@ -24,14 +25,14 @@ namespace Courseware.Coach.ViewModels
     public class CoachesViewModel : ReactiveObject
     {
         public Interaction<string, bool> Alert { get; } = new Interaction<string, bool>();
-        protected IRepository<UnitOfWork, CH> CoachRepository { get; }
+        protected IBusinessRepositoryFacade<CH, UnitOfWork> CoachRepository { get; }
         public ReactiveCommand<LoadParameters<CH>?, ItemsResultSet<CH>?> Load { get; }
         public Action Reload { get; set; } = null!;
         protected ILogger Logger { get; }
         public AddCoachViewModel AddViewModel { get; }
         protected ITTS TTS { get; }
         
-        public CoachesViewModel(IRepository<UnitOfWork, CH> coachRepository, ITTS tts, ILogger<CoachesViewModel> logger)
+        public CoachesViewModel(IBusinessRepositoryFacade<CH, UnitOfWork> coachRepository, ITTS tts, ILogger<CoachesViewModel> logger)
         {
             CoachRepository = coachRepository;
             Logger = logger;
@@ -59,7 +60,7 @@ namespace Courseware.Coach.ViewModels
     {
         public Guid Id { get; protected set; }
         public Interaction<string, bool> Alert { get; } = new Interaction<string, bool>();
-        protected IRepository<UnitOfWork, CH> CoachRepository { get; }
+        protected IBusinessRepositoryFacade<CH, UnitOfWork> CoachRepository { get; }
         private CoachViewModel? viewModel;
         public CoachViewModel? ViewModel
         {
@@ -69,7 +70,7 @@ namespace Courseware.Coach.ViewModels
         protected ILogger Logger { get; }
         public ReactiveCommand<Guid, Unit> Load { get; }    
         protected ITTS TTS { get; }
-        public CoachLoaderViewModel(IRepository<UnitOfWork, CH> coachRepository, ITTS tts, ILogger<CoachLoaderViewModel> logger)
+        public CoachLoaderViewModel(IBusinessRepositoryFacade<CH, UnitOfWork> coachRepository, ITTS tts, ILogger<CoachLoaderViewModel> logger)
         {
             CoachRepository = coachRepository;
             TTS = tts;
@@ -95,7 +96,7 @@ namespace Courseware.Coach.ViewModels
     {
         public Guid Id { get; }
         public Interaction<string, bool> Alert { get; } = new Interaction<string, bool>();
-        protected IRepository<UnitOfWork, CH> CoachRepository { get; }
+        protected IBusinessRepositoryFacade<CH, UnitOfWork> CoachRepository { get; }
         private CH? data;
         private bool disposedValue;
 
@@ -144,7 +145,7 @@ namespace Courseware.Coach.ViewModels
         public ObservableCollection<VoiceInfo> Voices { get; } = new ObservableCollection<VoiceInfo>();
         protected readonly CompositeDisposable disposables = new CompositeDisposable();
         public ObservableCollection<CoachInstanceViewModel> CoachInstances { get; } = new ObservableCollection<CoachInstanceViewModel>();
-        public CoachViewModel(Guid id, IRepository<UnitOfWork, CH> coachRepository, ITTS tts, ILogger logger)
+        public CoachViewModel(Guid id, IBusinessRepositoryFacade<CH, UnitOfWork> coachRepository, ITTS tts, ILogger logger)
         {
             Id = id;
             CoachRepository = coachRepository;
@@ -551,7 +552,7 @@ namespace Courseware.Coach.ViewModels
         public ReactiveCommand<Unit, Unit> Open { get; }
         public ReactiveCommand<Unit, Unit> Cancel { get; }
         protected ILogger Logger { get; }
-        protected IRepository<UnitOfWork, CH> CoachRepository { get; }
+        protected IBusinessRepositoryFacade<CH, UnitOfWork> CoachRepository { get; }
         protected ITTS TTS { get; }
         public ObservableCollection<string> Locales { get; } = new ObservableCollection<string>();
         public ObservableCollection<VoiceInfo> Voices { get; } = new ObservableCollection<VoiceInfo>();
@@ -575,7 +576,7 @@ namespace Courseware.Coach.ViewModels
                 this.RaisePropertyChanged();
             }
         }
-        public AddCoachViewModel(CoachesViewModel parent, IRepository<UnitOfWork, CH> coachRepository, ITTS tts, ILogger logger)
+        public AddCoachViewModel(CoachesViewModel parent, IBusinessRepositoryFacade<CH, UnitOfWork> coachRepository, ITTS tts, ILogger logger)
         {
             Parent = parent;
             TTS = tts;

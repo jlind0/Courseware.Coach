@@ -1,4 +1,5 @@
-﻿using Courseware.Coach.Core;
+﻿using Courseware.Coach.Business.Core;
+using Courseware.Coach.Core;
 using Courseware.Coach.Data;
 using Courseware.Coach.Data.Core;
 using Courseware.Coach.LLM.Core;
@@ -22,11 +23,11 @@ namespace Courseware.Coach.ViewModels
     public class UsersViewModel : ReactiveObject
     {
         public Interaction<string, bool> Alert { get; } = new Interaction<string, bool>();
-        protected IRepository<UnitOfWork, User> UserRepository { get; }
+        protected IBusinessRepositoryFacade<User, UnitOfWork> UserRepository { get; }
         protected ILogger Logger { get; }
         public ReactiveCommand<LoadParameters<User>?, ItemsResultSet<User>?> Load { get; }
 
-        public UsersViewModel(IRepository<UnitOfWork, User> userRepository, ILogger<UsersViewModel> logger)
+        public UsersViewModel(IBusinessRepositoryFacade<User, UnitOfWork> userRepository, ILogger<UsersViewModel> logger)
         {
             UserRepository = userRepository;
             Logger = logger;
@@ -50,7 +51,7 @@ namespace Courseware.Coach.ViewModels
     public class UserViewModel : ReactiveObject, IDisposable
     {
         protected ISecurityFactory SecurityFactory { get; }
-        protected IRepository<UnitOfWork, User> UserRepository { get; }
+        protected IBusinessRepositoryFacade<User, UnitOfWork> UserRepository { get; }
         protected ILogger Logger { get; }
         public Interaction<string, bool> Alert { get; } = new Interaction<string, bool>();
         public ReactiveCommand<Unit, Unit> Load { get; }
@@ -90,7 +91,7 @@ namespace Courseware.Coach.ViewModels
             }
         }
         protected ITTS TTS { get; }
-        public UserViewModel(ISecurityFactory securityFactory, IRepository<UnitOfWork, User> userRepository, ITTS tts, ILogger<UserViewModel> logger)
+        public UserViewModel(ISecurityFactory securityFactory, IBusinessRepositoryFacade<User, UnitOfWork> userRepository, ITTS tts, ILogger<UserViewModel> logger)
         {
             SecurityFactory = securityFactory;
             TTS = tts;
@@ -194,11 +195,11 @@ namespace Courseware.Coach.ViewModels
             protected set => this.RaiseAndSetIfChanged(ref viewModel, value);
         }
         public Interaction<string, bool> Alert { get; } = new Interaction<string, bool>();
-        protected IRepository<UnitOfWork, User> UserRepository { get; }
+        protected IBusinessRepositoryFacade<User, UnitOfWork> UserRepository { get; }
         protected ILogger Logger { get; }
         public ReactiveCommand<Guid, Unit> Load { get; }
         protected ITTS TTS { get; }
-        public UserAdminLoaderViewModel(IRepository<UnitOfWork, User> userRepository, ITTS tts, ILogger<UserAdminLoaderViewModel> logger)
+        public UserAdminLoaderViewModel(IBusinessRepositoryFacade<User, UnitOfWork> userRepository, ITTS tts, ILogger<UserAdminLoaderViewModel> logger)
         {
             TTS = tts;
             UserRepository = userRepository;
@@ -238,7 +239,7 @@ namespace Courseware.Coach.ViewModels
             protected set => this.RaiseAndSetIfChanged(ref data, value);
         }
         public Interaction<string, bool> Alert { get; } = new Interaction<string, bool>();
-        protected IRepository<UnitOfWork, User> UserRepository { get; }
+        protected IBusinessRepositoryFacade<User, UnitOfWork> UserRepository { get; }
         protected ILogger Logger { get; }
         public ReactiveCommand<Unit, Unit> Save { get; }
         public ReactiveCommand<Unit, Unit> Load { get; }
@@ -271,7 +272,7 @@ namespace Courseware.Coach.ViewModels
             }
         }
         protected ITTS TTS { get; }
-        public UserAdminViewModel(Guid id, IRepository<UnitOfWork, User> userRepository, ITTS tts, ILogger logger)
+        public UserAdminViewModel(Guid id, IBusinessRepositoryFacade<User, UnitOfWork> userRepository, ITTS tts, ILogger logger)
         {
             Id = id;
             TTS = tts;

@@ -22,6 +22,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Courseware.Coach.Business.Core\Courseware.Coach.Business.Core.csproj" />
+    <ProjectReference Include="..\Courseware.Coach.Business\Courseware.Coach.Business.csproj" />
     <ProjectReference Include="..\Courseware.Coach.Core\Courseware.Coach.Core.csproj" />
     <ProjectReference Include="..\Courseware.Coach.Data.Core\Courseware.Coach.Data.Core.csproj" />
     <ProjectReference Include="..\Courseware.Coach.Data\Courseware.Coach.Data.csproj" />

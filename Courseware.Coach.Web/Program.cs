@@ -21,6 +21,8 @@ using Courseware.Coach.LLM.Core;
 using Courseware.Coach.LLM;
 using Courseware.Coach.ViewModels;
 using Courseware.Coach.Web.Pages;
+using Courseware.Coach.Business.Core;
+using Courseware.Coach.Business;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -55,6 +57,9 @@ builder.Services.AddSingleton<IRepository<UnitOfWork, User>, Repository<User>>()
 builder.Services.AddSingleton<IRepository<UnitOfWork, Coach>, Repository<Coach>>();
 builder.Services.AddSingleton<IRepository<UnitOfWork, Course>, Repository<Course>>();
 builder.Services.AddSingleton<ISubscriptionManager, SubscriptionManager>();
+builder.Services.AddSingleton<IBusinessRepositoryFacade<Course, UnitOfWork>, CourseFacade>();
+builder.Services.AddSingleton<IBusinessRepositoryFacade<Coach, UnitOfWork>, CoachFacade>();
+builder.Services.AddSingleton<IBusinessRepositoryFacade<User, UnitOfWork>, BusinessRepositoryFacade<User, UnitOfWork>>();
 builder.Services.AddSingleton<ICloneAI, CloneAI>();
 builder.Services.AddSingleton<ITTS, TTS>();
 builder.Services.AddSingleton<ITranslationService, TranslationService>();
