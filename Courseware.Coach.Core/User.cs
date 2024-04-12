@@ -89,7 +89,6 @@ namespace Courseware.Coach.Core
         public string Name { get; set; } = null!;
         [Required]
         public string Slug { get; set; } = null!;
-        public int DaysToComplete { get; set; } = 90;
         public string NativeLocale { get; set; } = "en-US";
         public string? DefaultVoiceName { get; set; }
     }

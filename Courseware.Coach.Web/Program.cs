@@ -64,6 +64,7 @@ builder.Services.AddTransient<CoachesViewModel>();
 builder.Services.AddTransient<UsersViewModel>();
 builder.Services.AddTransient<UserAdminLoaderViewModel>();
 builder.Services.AddTransient<UserViewModel>();
+builder.Services.AddTransient<CoachLoaderViewModel>();
 builder.Services.AddLogging();
 builder.Services.AddSession();
 var app = builder.Build();

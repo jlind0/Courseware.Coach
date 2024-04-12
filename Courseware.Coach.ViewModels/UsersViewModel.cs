@@ -47,7 +47,7 @@ namespace Courseware.Coach.ViewModels
             }
         }
     }
-    public class UserViewModel : ReactiveObject
+    public class UserViewModel : ReactiveObject, IDisposable
     {
         protected ISecurityFactory SecurityFactory { get; }
         protected IRepository<UnitOfWork, User> UserRepository { get; }
@@ -56,6 +56,8 @@ namespace Courseware.Coach.ViewModels
         public ReactiveCommand<Unit, Unit> Load { get; }
         public ReactiveCommand<Unit, Unit> Save { get; }
         private User? data;
+        private bool disposedValue;
+
         public User? Data
         {
             get => data;
@@ -96,6 +98,23 @@ namespace Courseware.Coach.ViewModels
             Logger = logger;
             Load = ReactiveCommand.CreateFromTask(DoLoad);
             Save = ReactiveCommand.CreateFromTask(DoSave);
+            this.WhenPropertyChanged(p => p.SelectedLocale).Subscribe(
+                async p =>
+                {
+                    try
+                    {
+                        Voices.Clear();
+                        var voices = await TTS.GetVoices(p.Value ?? "en-US");
+                        foreach (var voice in voices.OrderBy(v => v.ShortName))
+                            Voices.Add(voice);
+                        this.RaisePropertyChanged(nameof(SelectedVoice));
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogError(ex, ex.Message);
+                        await Alert.Handle(ex.Message).GetAwaiter();
+                    }
+                }).DisposeWith(disposables);
         }
         protected async Task DoLoad(CancellationToken token = default)
         {
@@ -113,11 +132,7 @@ namespace Courseware.Coach.ViewModels
                 var locales = await TTS.GetLocales(token);
                 foreach (var locale in locales.OrderBy(c => c))
                     Locales.Add(locale);
-                Voices.Clear();
-                var voices = await TTS.GetVoices(Data?.Locale ?? "en-US");
-                foreach (var voice in voices.OrderBy(v => v.ShortName))
-                    Voices.Add(voice);
-                
+                SelectedLocale = Data?.Locale;
             }
             catch (Exception ex)
             {
@@ -138,6 +153,35 @@ namespace Courseware.Coach.ViewModels
                 Logger.LogError(ex, ex.Message);
                 await Alert.Handle(ex.Message).GetAwaiter();
             }
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!disposedValue)
+            {
+                if (disposing)
+                {
+                    // TODO: dispose managed state (managed objects)
+                }
+                disposables.Dispose();
+                // TODO: free unmanaged resources (unmanaged objects) and override finalizer
+                // TODO: set large fields to null
+                disposedValue = true;
+            }
+        }
+
+        // // TODO: override finalizer only if 'Dispose(bool disposing)' has code to free unmanaged resources
+        ~UserViewModel()
+        {
+            // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+            Dispose(disposing: false);
+        }
+
+        public void Dispose()
+        {
+            // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+            Dispose(disposing: true);
+            GC.SuppressFinalize(this);
         }
     }
     public class UserAdminLoaderViewModel : ReactiveObject
@@ -160,6 +204,7 @@ namespace Courseware.Coach.ViewModels
             UserRepository = userRepository;
             Logger = logger;
             Load = ReactiveCommand.CreateFromTask<Guid>(DoLoad);
+
         }
         protected async Task DoLoad(Guid id, CancellationToken token = default)
         {
@@ -245,6 +290,7 @@ namespace Courseware.Coach.ViewModels
                         var voices = await TTS.GetVoices(p.Value ?? "en-US");
                         foreach (var voice in voices.OrderBy(v => v.ShortName))
                             Voices.Add(voice);
+                        this.RaisePropertyChanged(nameof(SelectedVoice));
                     }
                     catch (Exception ex) 
                     { 

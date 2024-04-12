@@ -1,0 +1,20 @@
+﻿@page "/admin/coaches/{CoachId:guid}"
+@inherits ReactiveInjectableComponentBase<CoachLoaderViewModel>
+@attribute [RoleAuthorization(Roles = "Admin")]
+@if (ViewModel != null)
+{
+    <AlertView Alert="ViewModel.Alert" />
+    <CoachAdminView ViewModel="ViewModel.ViewModel" />
+}
+
+@code {
+    [Parameter] public Guid CoachId { get; set; }
+    protected override async Task OnInitializedAsync()
+    {
+        if (ViewModel != null)
+        {
+            await ViewModel.Load.Execute(CoachId).GetAwaiter();
+        }
+        await base.OnInitializedAsync();
+    }
+}
