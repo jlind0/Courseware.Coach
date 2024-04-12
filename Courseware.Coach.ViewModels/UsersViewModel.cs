@@ -9,6 +9,7 @@ using ReactiveUI;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.IO.MemoryMappedFiles;
 using System.Linq;
 using System.Reactive;
 using System.Reactive.Disposables;
@@ -43,6 +44,99 @@ namespace Courseware.Coach.ViewModels
                 Logger.LogError(ex, ex.Message);
                 await Alert.Handle(ex.Message).GetAwaiter();
                 return null;
+            }
+        }
+    }
+    public class UserViewModel : ReactiveObject
+    {
+        protected ISecurityFactory SecurityFactory { get; }
+        protected IRepository<UnitOfWork, User> UserRepository { get; }
+        protected ILogger Logger { get; }
+        public Interaction<string, bool> Alert { get; } = new Interaction<string, bool>();
+        public ReactiveCommand<Unit, Unit> Load { get; }
+        public ReactiveCommand<Unit, Unit> Save { get; }
+        private User? data;
+        public User? Data
+        {
+            get => data;
+            protected set => this.RaiseAndSetIfChanged(ref data, value);
+        }
+        public ObservableCollection<string> Locales { get; } = new ObservableCollection<string>();
+        public ObservableCollection<VoiceInfo> Voices { get; } = new ObservableCollection<VoiceInfo>();
+        protected readonly CompositeDisposable disposables = new CompositeDisposable();
+        public string? SelectedLocale
+        {
+            get => Data?.Locale;
+            set
+            {
+                if (Data == null)
+                    return;
+                Data.Locale = value ?? "en-US";
+                this.RaisePropertyChanged();
+            }
+        }
+
+        public string? SelectedVoice
+        {
+            get => Data?.DefaultVoiceName;
+            set
+            {
+                if (Data == null)
+                    return;
+                Data.DefaultVoiceName = value;
+                this.RaisePropertyChanged();
+            }
+        }
+        protected ITTS TTS { get; }
+        public UserViewModel(ISecurityFactory securityFactory, IRepository<UnitOfWork, User> userRepository, ITTS tts, ILogger<UserViewModel> logger)
+        {
+            SecurityFactory = securityFactory;
+            TTS = tts;
+            UserRepository = userRepository;
+            Logger = logger;
+            Load = ReactiveCommand.CreateFromTask(DoLoad);
+            Save = ReactiveCommand.CreateFromTask(DoSave);
+        }
+        protected async Task DoLoad(CancellationToken token = default)
+        {
+            try
+            {
+                var principal = await SecurityFactory.GetPrincipal();
+                if (principal == null)
+                    throw new UnauthorizedAccessException();
+                var id = principal.GetUserId();
+                var users = await UserRepository.Get(filter: q => q.ObjectId == id, token: token);
+                if (users.Count == 0)
+                    throw new UnauthorizedAccessException();
+                Data = users.Items.SingleOrDefault();
+                Locales.Clear();
+                var locales = await TTS.GetLocales(token);
+                foreach (var locale in locales.OrderBy(c => c))
+                    Locales.Add(locale);
+                Voices.Clear();
+                var voices = await TTS.GetVoices(Data?.Locale ?? "en-US");
+                foreach (var voice in voices.OrderBy(v => v.ShortName))
+                    Voices.Add(voice);
+                
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, ex.Message);
+                await Alert.Handle(ex.Message).GetAwaiter();
+            }
+        }
+        protected async Task DoSave(CancellationToken token = default)
+        {
+            try
+            {
+                if (Data == null)
+                    throw new InvalidDataException();
+                await UserRepository.Update(Data, token: token);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, ex.Message);
+                await Alert.Handle(ex.Message).GetAwaiter();
             }
         }
     }

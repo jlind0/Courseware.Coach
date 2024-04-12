@@ -33,11 +33,20 @@
                 </NavLink>
             </div>
         }
+        @if(isLoggedIn)
+        {
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="/profile">
+                    <span aria-hidden="true"><i class="fa-solid fa-user"></i></span>&nbsp;Profile
+                </NavLink>
+            </div>
+        }
     </nav>
 </div>
 
 @code {
     private bool isAdmin = false;
+    private bool isLoggedIn = false;
     private bool collapseNavMenu = true;
 
     private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
@@ -49,7 +58,8 @@
     protected override async Task OnInitializedAsync()
     {
         var authState = await AuthState.GetAuthenticationStateAsync();
-        isAdmin = authState.User.IsInRole("Admin");
+        isLoggedIn = authState.User?.Identity?.IsAuthenticated ?? false;
+        isAdmin = authState.User?.IsInRole("Admin") ?? false;
         await base.OnInitializedAsync();
     }
 }

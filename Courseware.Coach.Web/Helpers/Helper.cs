@@ -172,7 +172,7 @@ namespace Courseware.Coach.Web.Helpers
                     await file.Stream.ReadAsync(buffer);
                     await command.Execute(buffer).GetAwaiter();
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
                     throw;
                 }
@@ -190,7 +190,7 @@ namespace Courseware.Coach.Web.Helpers
                     await stream.CopyToAsync(ms);
                     await command.Execute(ms.ToArray()).GetAwaiter();
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
                     throw;
                 }
