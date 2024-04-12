@@ -41,11 +41,24 @@ namespace Courseware.Coach.Subscriptions
         }
         public async Task<bool> IsSubscribedToCoach(Guid coachId, string objectId, CancellationToken token = default)
         {
+            var users = await UserRepo.Get(filter: u => u.ObjectId == objectId, token: token);
+            var user = users.Items.SingleOrDefault();
+            if(user != null && user.Roles.Any(r => r == "Admin" || r == $"Admin:Coach:{coachId}"))
+            {
+                return true;
+            }
+              
             return (await GetCurrentSubscriptionForCoach(coachId, objectId, token)) != null;
         }
 
         public async Task<bool> IsSubscribedToCourse(Guid courseId, string objectId, CancellationToken token = default)
         {
+            var users = await UserRepo.Get(filter: u => u.ObjectId == objectId, token: token);
+            var user = users.Items.SingleOrDefault();
+            if (user != null && user.Roles.Any(r => r == "Admin" || r == $"Admin:Course:{courseId}"))
+            {
+                return true;
+            }
             return (await GetCurrentSubscriptionForCourse(courseId, objectId, token)) != null;
         }
         protected async Task CreateProduct(IPriced entity, CancellationToken token = default)

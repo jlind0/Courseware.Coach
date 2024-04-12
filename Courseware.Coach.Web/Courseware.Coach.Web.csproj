@@ -15,6 +15,8 @@
     <PackageReference Include="Microsoft.AspNetCore.Mvc.NewtonsoftJson" Version="8.0.3" />
     <PackageReference Include="Microsoft.Identity.Web" Version="2.16.0" />
     <PackageReference Include="Microsoft.Identity.Web.UI" Version="2.16.0" />
+    <PackageReference Include="Mime-Detective" Version="23.10.1" />
+    <PackageReference Include="Mime-Detective.Definitions.Exhaustive" Version="23.10.1" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="ReactiveUI.Blazor" Version="19.6.1" />
     <PackageReference Include="Stripe.net" Version="43.22.0" />
@@ -29,6 +31,8 @@
     <ProjectReference Include="..\Courseware.Coach.Data\Courseware.Coach.Data.csproj" />
     <ProjectReference Include="..\Courseware.Coach.LLM.Core\Courseware.Coach.LLM.Core.csproj" />
     <ProjectReference Include="..\Courseware.Coach.LLM\Courseware.Coach.LLM.csproj" />
+    <ProjectReference Include="..\Courseware.Coach.Storage.Core\Courseware.Coach.Storage.Core.csproj" />
+    <ProjectReference Include="..\Courseware.Coach.Storage\Courseware.Coach.Storage.csproj" />
     <ProjectReference Include="..\Courseware.Coach.Subscriptions.Core\Courseware.Coach.Subscriptions.Core.csproj" />
     <ProjectReference Include="..\Courseware.Coach.Subscriptions\Courseware.Coach.Subscriptions.csproj" />
     <ProjectReference Include="..\Courseware.Coach.ViewModels\Courseware.Coach.ViewModels.csproj" />

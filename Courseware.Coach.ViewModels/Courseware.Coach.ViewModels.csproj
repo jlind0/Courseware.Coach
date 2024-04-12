@@ -7,8 +7,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.Components.Authorization" Version="8.0.4" />
-    <PackageReference Include="Microsoft.AspNetCore.Http.Abstractions" Version="2.2.0" />
     <PackageReference Include="ReactiveUI" Version="19.6.1" />
   </ItemGroup>
 
@@ -18,6 +16,7 @@
     <ProjectReference Include="..\Courseware.Coach.Data.Core\Courseware.Coach.Data.Core.csproj" />
     <ProjectReference Include="..\Courseware.Coach.Data\Courseware.Coach.Data.csproj" />
     <ProjectReference Include="..\Courseware.Coach.LLM.Core\Courseware.Coach.LLM.Core.csproj" />
+    <ProjectReference Include="..\Courseware.Coach.Storage.Core\Courseware.Coach.Storage.Core.csproj" />
     <ProjectReference Include="..\Courseware.Coach.Subscriptions.Core\Courseware.Coach.Subscriptions.Core.csproj" />
   </ItemGroup>
 

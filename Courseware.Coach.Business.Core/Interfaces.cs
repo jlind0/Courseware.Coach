@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Security.Claims;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -48,4 +49,5 @@ namespace Courseware.Coach.Business.Core
         Task<TEntity> Update(TEntity entity,
             TUoW? work = null, CancellationToken token = default);
     }
+    
 }

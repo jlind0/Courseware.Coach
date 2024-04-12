@@ -15,6 +15,7 @@
                 <FormItem Field="@nameof(CH.Name)" LabelText="Name" />
                 <FormItem Field="@nameof(CH.Description)" LabelText="Description" />
                 <FormItem Field="@nameof(CH.Slug)" LabelText="Slug" />
+                <FormItem Field="@nameof(CH.IsPublished)" LabelText="Is Published"/> 
                 <FormItem Field="@nameof(CH.Price)" LabelText="Price" />
                 <FormItem Field="@nameof(CH.DaysToComplete)" LabelText="Days to Complete" />
                 <FormItem Field="@nameof(CH.NativeLocale)" LabelText="Native Locale">
@@ -46,6 +47,18 @@
                 <FormItem Field="@nameof(CH.APIKey)" LabelText="API Key" />
             </FormItems>
         </TelerikForm>
+        <h4>Upload Thumbnail Image</h4>
+        <InputFile OnChange="ViewModel.UploadThumbnail.BindUploadBuiltInCommand(this)" accept=".jpg,.jpeg,.png,.gif,.bmp,.tiff,.svg,.webp" />
+        @if (!string.IsNullOrEmpty(ViewModel.Data.ThumbnailImageId))
+        {
+            <img src="/api/images/@(ViewModel.Data.ThumbnailImageId)" alt="Thumbnail Image" />
+        }
+        <h4>Upload Banner Image</h4>
+        <InputFile OnChange="ViewModel.UploadBanner.BindUploadBuiltInCommand(this)" accept=".jpg,.jpeg,.png,.gif,.bmp,.tiff,.svg,.webp" />
+        @if (!string.IsNullOrEmpty(ViewModel.Data.BannerImageId))
+        {
+            <img src="/api/images/@(ViewModel.Data.BannerImageId)" alt="Banner Image" />
+        }
         <AddCoachInstanceView ViewModel="ViewModel.AddInstanceViewModel"/>
         <TelerikGrid @ref="grdRef" Data="ViewModel.CoachInstances" Sortable="true">
             <GridColumns>
@@ -77,6 +90,21 @@
                         </TelerikDropDownList>
                     </Template>
                 </GridColumn>
+                <GridColumn Title="Images">
+                    <Template>
+                        <InputFile OnChange="((CoachInstanceViewModel)context).UploadThumbnail.BindUploadBuiltInCommand(this)" accept=".jpg,.jpeg,.png,.gif,.bmp,.tiff,.svg,.webp" />
+                        @if (!string.IsNullOrEmpty(((CoachInstanceViewModel)context).Data.ThumbnailImageId))
+                        {
+                            <img src="/api/images/@(((CoachInstanceViewModel)context).Data.ThumbnailImageId)" alt="Thumbnail Image" />
+                        }
+                        <InputFile OnChange="((CoachInstanceViewModel)context).UploadBanner.BindUploadBuiltInCommand(this)" accept=".jpg,.jpeg,.png,.gif,.bmp,.tiff,.svg,.webp" />
+                        @if (!string.IsNullOrEmpty(((CoachInstanceViewModel)context).Data.BannerImageId))
+                        {
+                            <img src="/api/images/@(((CoachInstanceViewModel)context).Data.BannerImageId)" alt="Banner Image" />
+                        }
+                    
+                    </Template>
+                </GridColumn>
                 <GridColumn Field="@nameof(CoachInstance.Id)" Title="Commands">
                     <Template>
                         <TelerikButton OnClick="(((CoachInstanceViewModel)context)).Parent.RemoveInstance.BindCommand<MouseEventArgs>(((CoachInstanceViewModel)context).Data.Id)">
@@ -84,6 +112,7 @@
                         </TelerikButton>
                     </Template>
                 </GridColumn>
+                
             </GridColumns>
         </TelerikGrid>
     }

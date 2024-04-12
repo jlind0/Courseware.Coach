@@ -1,9 +1,8 @@
 ﻿@page "/admin/courses"
 @inject NavigationManager Nav
 @inherits ReactiveInjectableComponentBase<CoursesViewModel>
-@attribute [RoleAuthorization(Roles = "Admin")]
 @if (ViewModel != null)
-{
+{                                      
     <AlertView Alert="ViewModel.Alert" />
     <AddCourseView ViewModel="ViewModel.AddCourseViewModel"/>
     <TelerikGrid @ref="grdRef" TItem="CourseViewModel" OnRead="ViewModel.Load.BindReadCommand<Course, CourseViewModel>(this)"

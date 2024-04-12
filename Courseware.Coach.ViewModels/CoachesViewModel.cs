@@ -3,7 +3,9 @@ using Courseware.Coach.Core;
 using Courseware.Coach.Data;
 using Courseware.Coach.Data.Core;
 using Courseware.Coach.LLM.Core;
+using Courseware.Coach.Storage.Core;
 using DynamicData.Binding;
+using Microsoft.Azure.Cosmos.Serialization.HybridRow;
 using Microsoft.CognitiveServices.Speech;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion.Internal;
 using Microsoft.Extensions.Logging;
@@ -31,10 +33,12 @@ namespace Courseware.Coach.ViewModels
         protected ILogger Logger { get; }
         public AddCoachViewModel AddViewModel { get; }
         protected ITTS TTS { get; }
-        
-        public CoachesViewModel(IBusinessRepositoryFacade<CH, UnitOfWork> coachRepository, ITTS tts, ILogger<CoachesViewModel> logger)
+        protected ISecurityFactory Security { get; }
+        public bool IsForAdmin { get; set; } = true;
+        public CoachesViewModel(IBusinessRepositoryFacade<CH, UnitOfWork> coachRepository, ISecurityFactory security, ITTS tts, ILogger<CoachesViewModel> logger)
         {
             CoachRepository = coachRepository;
+            Security = security;
             Logger = logger;
             TTS = tts;
             Load = ReactiveCommand.CreateFromTask<LoadParameters<CH>?, ItemsResultSet<CH>?>(DoLoad);
@@ -46,6 +50,16 @@ namespace Courseware.Coach.ViewModels
             {
                 var results = await CoachRepository.Get(page: loadParameters?.Pager, 
                     filter: loadParameters?.Filter, orderBy: loadParameters?.OrderBy, token: token);
+                if (IsForAdmin)
+                {
+                    var auth = await Security.GetPrincipal();
+                    if (auth == null)
+                        return null;
+                    if (!auth.IsInRole("Admin"))
+                    {
+                        results.Items = results.Items.Where(x => auth.IsInRole($"Admin:Coach:{x.Id}")).ToList();
+                    }
+                }
                 return results;
             }
             catch (Exception ex)
@@ -70,9 +84,11 @@ namespace Courseware.Coach.ViewModels
         protected ILogger Logger { get; }
         public ReactiveCommand<Guid, Unit> Load { get; }    
         protected ITTS TTS { get; }
-        public CoachLoaderViewModel(IBusinessRepositoryFacade<CH, UnitOfWork> coachRepository, ITTS tts, ILogger<CoachLoaderViewModel> logger)
+        protected IStorageBlob Storage { get; }
+        public CoachLoaderViewModel(IBusinessRepositoryFacade<CH, UnitOfWork> coachRepository, IStorageBlob storage, ITTS tts, ILogger<CoachLoaderViewModel> logger)
         {
             CoachRepository = coachRepository;
+            Storage = storage;
             TTS = tts;
             Logger = logger;
             Load = ReactiveCommand.CreateFromTask<Guid>(DoLoad);
@@ -82,7 +98,7 @@ namespace Courseware.Coach.ViewModels
             try
             {
                 var coach = await CoachRepository.Get(id, token: token);
-                ViewModel = new CoachViewModel(id, CoachRepository, TTS, Logger);
+                ViewModel = new CoachViewModel(id, Storage, CoachRepository, TTS, Logger);
                 await ViewModel.Load.Execute().GetAwaiter();
             }
             catch (Exception ex)
@@ -145,10 +161,14 @@ namespace Courseware.Coach.ViewModels
         public ObservableCollection<VoiceInfo> Voices { get; } = new ObservableCollection<VoiceInfo>();
         protected readonly CompositeDisposable disposables = new CompositeDisposable();
         public ObservableCollection<CoachInstanceViewModel> CoachInstances { get; } = new ObservableCollection<CoachInstanceViewModel>();
-        public CoachViewModel(Guid id, IBusinessRepositoryFacade<CH, UnitOfWork> coachRepository, ITTS tts, ILogger logger)
+        protected IStorageBlob Storage { get; }
+        public ReactiveCommand<byte[], Unit> UploadThumbnail { get; }
+        public ReactiveCommand<byte[], Unit> UploadBanner { get; }
+        public CoachViewModel(Guid id, IStorageBlob storage, IBusinessRepositoryFacade<CH, UnitOfWork> coachRepository, ITTS tts, ILogger logger)
         {
             Id = id;
             CoachRepository = coachRepository;
+            Storage = storage;
             TTS = tts;
             Logger = logger;
             AddInstanceViewModel = new AddCoachInstanceViewModel(this, tts, logger);
@@ -156,6 +176,8 @@ namespace Courseware.Coach.ViewModels
             Save = ReactiveCommand.CreateFromTask(DoSave);
             AddInstance = ReactiveCommand.CreateFromTask<CoachInstance>(DoAddInstance);
             RemoveInstance = ReactiveCommand.CreateFromTask<Guid>(DoRemoveInstance);
+            UploadThumbnail = ReactiveCommand.CreateFromTask<byte[]>(DoUploadThumbnail);
+            UploadBanner = ReactiveCommand.CreateFromTask<byte[]>(DoUploadBanner);
             this.WhenPropertyChanged(p => p.SelectedLocale).Subscribe(
                 async p =>
                 {
@@ -174,6 +196,40 @@ namespace Courseware.Coach.ViewModels
                     }
                 }).DisposeWith(disposables);
         }
+        protected async Task DoUploadThumbnail(byte[] data, CancellationToken token = default)
+        {
+            try
+            {
+                if (Data == null)
+                    return;
+                var id = Data.ThumbnailImageId ?? Guid.NewGuid().ToString();
+                await Storage.SetData(id, data, token);
+                Data.ThumbnailImageId = id;
+                await DoSave(token);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, ex.Message);
+                await Alert.Handle(ex.Message).GetAwaiter();
+            }
+        }
+        protected async Task DoUploadBanner(byte[] data, CancellationToken token = default)
+        {
+            try
+            {
+                if (Data == null)
+                    return;
+                var id = Data.BannerImageId ?? Guid.NewGuid().ToString();
+                await Storage.SetData(id, data, token);
+                Data.BannerImageId = id;
+                await DoSave(token);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, ex.Message);
+                await Alert.Handle(ex.Message).GetAwaiter();
+            }
+        }
         protected async Task DoLoad(CancellationToken token = default)
         {
             try
@@ -185,7 +241,7 @@ namespace Courseware.Coach.ViewModels
                     CoachInstances.Clear();
                     foreach(var isnt in Data.Instances)
                     {
-                        var vm = new CoachInstanceViewModel(this, isnt, TTS, Logger);
+                        var vm = new CoachInstanceViewModel(this, Storage, isnt, TTS, Logger);
                         await vm.Load.Execute().GetAwaiter();
                         CoachInstances.Add(vm);
                     }
@@ -433,6 +489,9 @@ namespace Courseware.Coach.ViewModels
         public ObservableCollection<VoiceInfo> Voices { get; } = new ObservableCollection<VoiceInfo>();
         protected readonly CompositeDisposable disposables = new CompositeDisposable();
         public ReactiveCommand<Unit, Unit> Load { get; }
+        protected IStorageBlob Storage { get; }
+        public ReactiveCommand<byte[], Unit> UploadThumbnail { get; }
+        public ReactiveCommand<byte[], Unit> UploadBanner { get; }
         public CoachInstance Data { get; }
         public string? SelectedLocale
         {
@@ -454,13 +513,16 @@ namespace Courseware.Coach.ViewModels
                 this.RaisePropertyChanged();
             }
         }
-        public CoachInstanceViewModel(CoachViewModel parent, CoachInstance data, ITTS tts, ILogger logger)
+        public CoachInstanceViewModel(CoachViewModel parent, IStorageBlob storage, CoachInstance data, ITTS tts, ILogger logger)
         {
             Parent = parent;
+            Storage = storage;
             Data = data;
             TTS = tts;
             Logger = logger;
             Load = ReactiveCommand.CreateFromTask(DoLoad);
+            UploadThumbnail = ReactiveCommand.CreateFromTask<byte[]>(DoUploadThumbnail);
+            UploadBanner = ReactiveCommand.CreateFromTask<byte[]>(DoUploadBanner);
             this.WhenPropertyChanged(p => p.SelectedLocale).Subscribe(
                 async p =>
                 {
@@ -478,6 +540,40 @@ namespace Courseware.Coach.ViewModels
                         await Alert.Handle(ex.Message).GetAwaiter();
                     }
                 }).DisposeWith(disposables);
+        }
+        protected async Task DoUploadThumbnail(byte[] data, CancellationToken token = default)
+        {
+            try
+            {
+                if (Data == null)
+                    return;
+                var id = Data.ThumbnailImageId ?? Guid.NewGuid().ToString();
+                await Storage.SetData(id, data, token);
+                Data.ThumbnailImageId = id;
+                await Parent.Save.Execute().GetAwaiter();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, ex.Message);
+                await Alert.Handle(ex.Message).GetAwaiter();
+            }
+        }
+        protected async Task DoUploadBanner(byte[] data, CancellationToken token = default)
+        {
+            try
+            {
+                if (Data == null)
+                    return;
+                var id = Data.BannerImageId ?? Guid.NewGuid().ToString();
+                await Storage.SetData(id, data, token);
+                Data.BannerImageId = id;
+                await Parent.Save.Execute().GetAwaiter();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, ex.Message);
+                await Alert.Handle(ex.Message).GetAwaiter();
+            }
         }
         protected async Task DoLoad(CancellationToken token = default)
         {

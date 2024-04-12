@@ -90,5 +90,11 @@
            </FormItem>
         </FormItems>
     </TelerikForm>
+        <h4>Upload Profile Image</h4>
+        <InputFile OnChange="ViewModel.SetProfileImage.BindUploadBuiltInCommand(this)" accept=".jpg,.jpeg,.png,.gif,.bmp,.tiff,.svg,.webp" />
+        @if (!string.IsNullOrEmpty(ViewModel.Data.ProfileImageId))
+        {
+            <img src="/api/images/@(ViewModel.Data.ProfileImageId)" alt="Profile Image" />
+        }
     }
 }

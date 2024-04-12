@@ -2,7 +2,6 @@
 @using CH = Courseware.Coach.Core.Coach
 @inject NavigationManager Nav
 @inherits ReactiveInjectableComponentBase<CoachesViewModel>
-@attribute [RoleAuthorization(Roles = "Admin")]
 @if(ViewModel != null)
 {
     <AlertView Alert="ViewModel.Alert"/>
@@ -15,6 +14,7 @@
                 <GridColumn Field="@nameof(CH.Price)" Title="Price" />
                 <GridColumn Field="@nameof(CH.NativeLocale)" Title="Native Locale" />  
                 <GridColumn Field="@nameof(CH.DefaultVoiceName)" Title="Default Voice Name" />
+                <GridColumn Field="@nameof(CH.IsPublished)"  Title="Is Published"/>
                 <GridColumn Field="@nameof(CH.Id)" Title="Open">
                     <Template>
                         <TelerikButton OnClick="() => Redirect(((CH)context).Id)">(...)</TelerikButton>

@@ -29,6 +29,10 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Courseware.Coach.Business.C
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Courseware.Coach.Business", "Courseware.Coach.Business\Courseware.Coach.Business.csproj", "{93552AB3-4B14-4A49-9119-DCC989974CCD}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Courseware.Coach.Storage.Core", "Courseware.Coach.Storage.Core\Courseware.Coach.Storage.Core.csproj", "{E41C4268-CA1C-4D83-A304-346AD1D87571}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Courseware.Coach.Storage", "Courseware.Coach.Storage\Courseware.Coach.Storage.csproj", "{F49A1671-0EC1-4EAF-97C1-7D19FC1AA65B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -87,6 +91,14 @@ Global
 		{93552AB3-4B14-4A49-9119-DCC989974CCD}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{93552AB3-4B14-4A49-9119-DCC989974CCD}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{93552AB3-4B14-4A49-9119-DCC989974CCD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E41C4268-CA1C-4D83-A304-346AD1D87571}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E41C4268-CA1C-4D83-A304-346AD1D87571}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E41C4268-CA1C-4D83-A304-346AD1D87571}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E41C4268-CA1C-4D83-A304-346AD1D87571}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F49A1671-0EC1-4EAF-97C1-7D19FC1AA65B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F49A1671-0EC1-4EAF-97C1-7D19FC1AA65B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F49A1671-0EC1-4EAF-97C1-7D19FC1AA65B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F49A1671-0EC1-4EAF-97C1-7D19FC1AA65B}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

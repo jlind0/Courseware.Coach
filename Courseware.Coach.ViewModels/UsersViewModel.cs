@@ -3,6 +3,7 @@ using Courseware.Coach.Core;
 using Courseware.Coach.Data;
 using Courseware.Coach.Data.Core;
 using Courseware.Coach.LLM.Core;
+using Courseware.Coach.Storage.Core;
 using DynamicData.Binding;
 using Microsoft.CognitiveServices.Speech;
 using Microsoft.Extensions.Logging;
@@ -57,6 +58,7 @@ namespace Courseware.Coach.ViewModels
         public Interaction<string, bool> Alert { get; } = new Interaction<string, bool>();
         public ReactiveCommand<Unit, Unit> Load { get; }
         public ReactiveCommand<Unit, Unit> Save { get; }
+        public ReactiveCommand<byte[], Unit> SetProfileImage { get; }
         private User? data;
         private bool disposedValue;
 
@@ -92,14 +94,17 @@ namespace Courseware.Coach.ViewModels
             }
         }
         protected ITTS TTS { get; }
-        public UserViewModel(ISecurityFactory securityFactory, IBusinessRepositoryFacade<User, UnitOfWork> userRepository, ITTS tts, ILogger<UserViewModel> logger)
+        protected IStorageBlob Storage { get; }
+        public UserViewModel(ISecurityFactory securityFactory, IStorageBlob storage, IBusinessRepositoryFacade<User, UnitOfWork> userRepository, ITTS tts, ILogger<UserViewModel> logger)
         {
             SecurityFactory = securityFactory;
+            Storage = storage;
             TTS = tts;
             UserRepository = userRepository;
             Logger = logger;
             Load = ReactiveCommand.CreateFromTask(DoLoad);
             Save = ReactiveCommand.CreateFromTask(DoSave);
+            SetProfileImage = ReactiveCommand.CreateFromTask<byte[]>(DoSetProfileImage);
             this.WhenPropertyChanged(p => p.SelectedLocale).Subscribe(
                 async p =>
                 {
@@ -117,6 +122,23 @@ namespace Courseware.Coach.ViewModels
                         await Alert.Handle(ex.Message).GetAwaiter();
                     }
                 }).DisposeWith(disposables);
+        }
+        protected async Task DoSetProfileImage(byte[] data, CancellationToken token = default)
+        {
+            try
+            {
+                if (Data == null)
+                    throw new InvalidDataException();
+                var id = Data.ProfileImageId ?? Guid.NewGuid().ToString();
+                await Storage.SetData(id, data, token);
+                Data.ProfileImageId = id;
+                await DoSave(token);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, ex.Message);
+                await Alert.Handle(ex.Message).GetAwaiter();
+            }
         }
         protected async Task DoLoad(CancellationToken token = default)
         {
@@ -199,16 +221,18 @@ namespace Courseware.Coach.ViewModels
         protected IBusinessRepositoryFacade<User, UnitOfWork> UserRepository { get; }
         protected IBusinessRepositoryFacade<CH, UnitOfWork> CoachRepository { get; }
         protected IBusinessRepositoryFacade<Course, UnitOfWork> CourseRepostory { get; }
+        protected IStorageBlob Storage { get; }
         protected ILogger Logger { get; }
         public ReactiveCommand<Guid, Unit> Load { get; }
         protected ITTS TTS { get; }
-        public UserAdminLoaderViewModel(IBusinessRepositoryFacade<User, UnitOfWork> userRepository, IBusinessRepositoryFacade<CH, UnitOfWork> coachRepository, IBusinessRepositoryFacade<Course, UnitOfWork> courseRepository, ITTS tts, ILogger<UserAdminLoaderViewModel> logger)
+        public UserAdminLoaderViewModel(IBusinessRepositoryFacade<User, UnitOfWork> userRepository, IStorageBlob storage, IBusinessRepositoryFacade<CH, UnitOfWork> coachRepository, IBusinessRepositoryFacade<Course, UnitOfWork> courseRepository, ITTS tts, ILogger<UserAdminLoaderViewModel> logger)
         {
             TTS = tts;
             UserRepository = userRepository;
             Logger = logger;
             CourseRepostory = courseRepository;
             CoachRepository = coachRepository;
+            Storage = storage;
             Load = ReactiveCommand.CreateFromTask<Guid>(DoLoad);
 
         }
@@ -217,7 +241,7 @@ namespace Courseware.Coach.ViewModels
             try
             {
                 Id = id;
-                ViewModel = new UserAdminViewModel(id, UserRepository, CoachRepository, CourseRepostory, TTS, Logger);
+                ViewModel = new UserAdminViewModel(id, Storage, UserRepository, CoachRepository, CourseRepostory, TTS, Logger);
                 await ViewModel.Load.Execute().GetAwaiter();
             }
             catch (Exception ex)
@@ -260,10 +284,12 @@ namespace Courseware.Coach.ViewModels
         protected IBusinessRepositoryFacade<CH, UnitOfWork> CoachRepository { get; }
         protected IBusinessRepositoryFacade<Course, UnitOfWork> CourseRepository { get; }
         protected ILogger Logger { get; }
+        protected IStorageBlob Storage { get; }
         public ReactiveCommand<Unit, Unit> Save { get; }
         public ReactiveCommand<Unit, Unit> Load { get; }
         public ReactiveCommand<string, Unit> AddRole { get; }
         public ReactiveCommand<string, Unit> RemoveRole { get; }
+        public ReactiveCommand<byte[], Unit> SetProfileImage { get; }
         public ObservableCollection<string> Locales { get; } = new ObservableCollection<string>();
         public ObservableCollection<VoiceInfo> Voices { get; } = new ObservableCollection<VoiceInfo>();
         public ObservableCollection<CH> Coaches { get; } = new ObservableCollection<CH>();
@@ -305,18 +331,20 @@ namespace Courseware.Coach.ViewModels
             }
         }
         protected ITTS TTS { get; }
-        public UserAdminViewModel(Guid id, IBusinessRepositoryFacade<User, UnitOfWork> userRepository, IBusinessRepositoryFacade<CH, UnitOfWork> coachRepository, IBusinessRepositoryFacade<Course, UnitOfWork> courseRepository, ITTS tts, ILogger logger)
+        public UserAdminViewModel(Guid id, IStorageBlob storage, IBusinessRepositoryFacade<User, UnitOfWork> userRepository, IBusinessRepositoryFacade<CH, UnitOfWork> coachRepository, IBusinessRepositoryFacade<Course, UnitOfWork> courseRepository, ITTS tts, ILogger logger)
         {
             Id = id;
             TTS = tts;
             UserRepository = userRepository;
             CoachRepository = coachRepository;
             CourseRepository = courseRepository;
+            Storage = storage;
             Logger = logger;
             Save = ReactiveCommand.CreateFromTask(DoSave);
             Load = ReactiveCommand.CreateFromTask(DoLoad);
             AddRole = ReactiveCommand.CreateFromTask<string>(DoAddRole);
             RemoveRole = ReactiveCommand.CreateFromTask<string>(DoRemoveRole);
+            SetProfileImage = ReactiveCommand.CreateFromTask<byte[]>(DoSetProfileImage);
             this.WhenPropertyChanged(p => p.SelectedLocale).Subscribe(
                 async p =>
                 {
@@ -334,6 +362,23 @@ namespace Courseware.Coach.ViewModels
                         await Alert.Handle(ex.Message).GetAwaiter();
                     }
                 }).DisposeWith(disposables);
+        }
+        protected async Task DoSetProfileImage(byte[] data, CancellationToken token = default)
+        {
+            try
+            {
+                if (Data == null)
+                    throw new InvalidDataException();
+                var id = Data.ProfileImageId ?? Guid.NewGuid().ToString();
+                await Storage.SetData(id, data, token);
+                Data.ProfileImageId = id;
+                await DoSave(token);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, ex.Message);
+                await Alert.Handle(ex.Message).GetAwaiter();
+            }
         }
         protected async Task DoAddRole(string role, CancellationToken token = default)
         {

@@ -1,7 +1,7 @@
 ﻿@page "/admin/clones"
 @using Courseware.Coach.LLM.Core
+@inject AuthenticationStateProvider AuthState
 @inherits ReactiveInjectableComponentBase<ClonesViewModel>
-@attribute [RoleAuthorization(Roles = "Admin")]
 @if(ViewModel != null)
 {
     <AlertView Alert="ViewModel.Alert"/>
@@ -28,6 +28,9 @@
 @code {
     protected override async Task OnInitializedAsync()
     {
+        var auth = await AuthState.GetAuthenticationStateAsync();
+        if (auth.User?.IsInStartsWithRole("Admin") == false)
+            throw new UnauthorizedAccessException();
         if (ViewModel != null)
             await ViewModel.Load.Execute().GetAwaiter();
         await base.OnInitializedAsync();

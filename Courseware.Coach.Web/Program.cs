@@ -23,6 +23,12 @@ using Courseware.Coach.ViewModels;
 using Courseware.Coach.Web.Pages;
 using Courseware.Coach.Business.Core;
 using Courseware.Coach.Business;
+using Courseware.Coach.Storage.Core;
+using Courseware.Coach.Storage;
+using MimeDetective;
+using MimeDetective.Storage;
+using System.Collections.Immutable;
+using Azure.Storage.Blobs;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -51,15 +57,34 @@ builder.Services.AddTransient<PriceService>();
 builder.Services.AddTransient<ProductService>();
 builder.Services.AddTransient<PaymentLinkService>();
 builder.Services.AddTransient<SessionService>();
+builder.Services.AddSingleton<BlobServiceClient>(x =>
+    new BlobServiceClient(builder.Configuration.GetConnectionString("ImageBlob"))
+);
+builder.Services.AddSingleton<IStorageBlob, StorageBlob>();
+builder.Services.AddSingleton<ContentInspector>(x =>
+{
+    var Extensions = new[]{
+    "jpg", "jpeg","png", "gif","bmp", "tiff", "webp", "svg"
+    }.ToImmutableHashSet(StringComparer.InvariantCultureIgnoreCase);
+    var Inspector = new ContentInspectorBuilder()
+    {
+
+        Definitions = new MimeDetective.Definitions.ExhaustiveBuilder()
+        {
+            UsageType = MimeDetective.Definitions.Licensing.UsageType.PersonalNonCommercial
+        }.Build().ScopeExtensions(Extensions).TrimMeta().TrimDescription().ToImmutableArray()
+    }.Build();
+    return Inspector;
+});
 builder.Services.AddScoped<ISecurityFactory, SecurityFactory>();
 builder.Services.AddSingleton<IUnitOfWorkFactory<UnitOfWork>, UnitOfWorkFactory>();
 builder.Services.AddSingleton<IRepository<UnitOfWork, User>, Repository<User>>();
 builder.Services.AddSingleton<IRepository<UnitOfWork, Coach>, Repository<Coach>>();
 builder.Services.AddSingleton<IRepository<UnitOfWork, Course>, Repository<Course>>();
 builder.Services.AddSingleton<ISubscriptionManager, SubscriptionManager>();
-builder.Services.AddSingleton<IBusinessRepositoryFacade<Course, UnitOfWork>, CourseFacade>();
-builder.Services.AddSingleton<IBusinessRepositoryFacade<Coach, UnitOfWork>, CoachFacade>();
-builder.Services.AddSingleton<IBusinessRepositoryFacade<User, UnitOfWork>, BusinessRepositoryFacade<User, UnitOfWork>>();
+builder.Services.AddScoped<IBusinessRepositoryFacade<Course, UnitOfWork>, CourseFacade>();
+builder.Services.AddScoped<IBusinessRepositoryFacade<Coach, UnitOfWork>, CoachFacade>();
+builder.Services.AddScoped<IBusinessRepositoryFacade<User, UnitOfWork>, BusinessRepositoryFacade<User, UnitOfWork>>();
 builder.Services.AddSingleton<ICloneAI, CloneAI>();
 builder.Services.AddSingleton<ITTS, TTS>();
 builder.Services.AddSingleton<ITranslationService, TranslationService>();

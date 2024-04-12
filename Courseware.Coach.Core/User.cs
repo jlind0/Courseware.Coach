@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
+using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -9,6 +10,10 @@ using System.Threading.Tasks;
 
 namespace Courseware.Coach.Core
 {
+    public interface ISecurityFactory
+    {
+        Task<ClaimsPrincipal?> GetPrincipal();
+    }
     public abstract class Item
     {
         [Required]
@@ -46,6 +51,7 @@ namespace Courseware.Coach.Core
         [Required]
         public string Locale { get; set; } = "en-US";
         public string? DefaultVoiceName { get; set; }
+        public string? ProfileImageId { get; set; }
     }
     public enum Gender
     {
@@ -80,6 +86,9 @@ namespace Courseware.Coach.Core
         public string? StripeProductId { get; set; }
         public string? StripePriceId { get; set; }
         public string? StripeUrl { get; set; }
+        public bool? IsPublished { get; set; } = false;
+        public string? ThumbnailImageId { get; set; }
+        public string? BannerImageId { get; set; }
     }
     public class CoachInstance
     {
@@ -91,6 +100,8 @@ namespace Courseware.Coach.Core
         public string Slug { get; set; } = null!;
         public string NativeLocale { get; set; } = "en-US";
         public string? DefaultVoiceName { get; set; }
+        public string? ThumbnailImageId { get; set; }
+        public string? BannerImageId { get; set; }
     }
     public class Course : Item, IPriced
     {
@@ -108,6 +119,9 @@ namespace Courseware.Coach.Core
         public string? StripeProductId { get; set; }
         public string? StripePriceId { get; set; }
         public string? StripeUrl { get; set; }
+        public bool? IsPublished { get; set; } = false;
+        public string? ThumbnailImageId { get; set; }
+        public string? BannerImageId { get; set; }
     }
     public class Lesson
     {
@@ -121,6 +135,8 @@ namespace Courseware.Coach.Core
     }
     public class Prompt
     {
+        [Required]
+        public Guid Id { get; set; } = Guid.NewGuid();
         [Required]
         public string Text { get; set; } = null!;
         [Required]

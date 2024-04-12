@@ -2,6 +2,7 @@
 using Courseware.Coach.Core;
 using Courseware.Coach.Data;
 using DynamicData.Binding;
+using Microsoft.CognitiveServices.Speech.Translation;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
 using System.Collections.ObjectModel;
@@ -21,9 +22,13 @@ namespace Courseware.Coach.ViewModels
         public ReactiveCommand<LoadParameters<Course>?, ViewModelQuery<CourseViewModel>?> Load { get; }
         public Action Reload { get; set; } = null!;
         public AddCourseViewModel AddCourseViewModel { get; }
-        public CoursesViewModel(IBusinessRepositoryFacade<Course, UnitOfWork> courseRepository, IBusinessRepositoryFacade<CH, UnitOfWork> coachRepository, ILogger<CoursesViewModel> logger)
+        protected ISecurityFactory Security { get; }
+        public bool IsForAdmin { get; set; } = true;
+        public CoursesViewModel(IBusinessRepositoryFacade<Course, UnitOfWork> courseRepository, 
+            IBusinessRepositoryFacade<CH, UnitOfWork> coachRepository, ILogger<CoursesViewModel> logger, ISecurityFactory security)
         {
             CourseRepository = courseRepository;
+            Security = security;
             CoachRepository = coachRepository;
             Logger = logger;
             Load = ReactiveCommand.CreateFromTask<LoadParameters<Course>?, ViewModelQuery<CourseViewModel>?>(DoLoad);
@@ -35,9 +40,20 @@ namespace Courseware.Coach.ViewModels
             {
                 var result = await CourseRepository.Get(page: parameters?.Pager,
                     filter: parameters?.Filter, orderBy: parameters?.OrderBy, token: token);
+                if (IsForAdmin)
+                {
+                    var auth = await Security.GetPrincipal();
+                    if (auth == null)
+                        return null;
+                    if(!auth.IsInRole("Admin"))
+                    {
+                       result.Items = result.Items.Where(x => auth.IsInRole($"Admin:Course:{x.Id}")).ToList();
+                    }
+                }
+
                 var query = new ViewModelQuery<CourseViewModel>()
                 {
-                    Data = result.Items.Select(x => new CourseViewModel(x, this, CoachRepository, CourseRepository, Logger)).ToList(),
+                    Data = result.Items.Select(x => new CourseViewModel(x, Security, CoachRepository, CourseRepository, Logger, Alert)).ToList(),
                     Count = result.Count ?? 0
                 };
                 foreach(var x in query.Data)
@@ -52,8 +68,51 @@ namespace Courseware.Coach.ViewModels
             }
         }
     }
+    public class CourseLoaderViewModel : ReactiveObject
+    {
+        public Guid Id { get; protected set; }
+        public Interaction<string, bool> Alert { get; } = new Interaction<string, bool>();
+        protected IBusinessRepositoryFacade<Course, UnitOfWork> CourseRepository { get; }
+        protected IBusinessRepositoryFacade<CH, UnitOfWork> CoachRepository { get; }
+        protected ISecurityFactory Security { get; }
+        protected ILogger Logger { get; }
+        public ReactiveCommand<Guid, Unit> Load { get; }
+        private CourseViewModel? data;
+        public CourseViewModel? Data
+        {
+            get => data;
+            set => this.RaiseAndSetIfChanged(ref data, value);
+        }
+        public CourseLoaderViewModel(IBusinessRepositoryFacade<Course, UnitOfWork> courseRepository, 
+                       IBusinessRepositoryFacade<CH, UnitOfWork> coachRepository, ILogger<CourseLoaderViewModel> logger, ISecurityFactory security)
+        {
+            CourseRepository = courseRepository;
+            CoachRepository = coachRepository;
+            Logger = logger;
+            Load = ReactiveCommand.CreateFromTask<Guid>(DoLoad);
+            Security = security;
+        }
+        private async Task DoLoad(Guid id, CancellationToken token)
+        {
+            try
+            {
+                Id = id;
+                var course = await CourseRepository.Get(id, token: token);
+                if (course == null)
+                    throw new InvalidDataException();
+                Data = new CourseViewModel(course, Security, CoachRepository, CourseRepository, Logger, Alert);
+                await Data.Load.Execute().GetAwaiter();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, ex.Message);
+                await Alert.Handle(ex.Message).GetAwaiter();
+            }
+        }
+    }
     public class CourseViewModel : ReactiveObject
     {
+        public Interaction<string, bool> Alert { get; } = null!;
         public Course Data { get; }
         private CH? coach;
         public CH? Coach
@@ -67,27 +126,83 @@ namespace Courseware.Coach.ViewModels
             get => coachInstance;
             set => this.RaiseAndSetIfChanged(ref coachInstance, value);
         }
-        protected CoursesViewModel Parent { get; }
         protected IBusinessRepositoryFacade<CH, UnitOfWork> CoachRepository { get; }
         protected IBusinessRepositoryFacade<Course, UnitOfWork> CourseRepository { get; }
+        protected ISecurityFactory Security { get; }
         public ReactiveCommand<Unit, Unit> Load { get; }
+        public ReactiveCommand<Lesson, Unit> AddLesson { get; }
+        public ReactiveCommand<Guid, Unit> RemoveLesson { get; }
+        public ReactiveCommand<Unit, Unit> Save { get; }
         protected ILogger Logger { get; }
-        public CourseViewModel(Course data, CoursesViewModel parent, 
+        private bool isAdmin;
+        public bool IsAdmin
+        {
+            get => isAdmin;
+            set => this.RaiseAndSetIfChanged(ref isAdmin, value);
+        }
+        public CourseViewModel(Course data, ISecurityFactory security,
             IBusinessRepositoryFacade<CH, UnitOfWork> coachRepository, 
-            IBusinessRepositoryFacade<Course, UnitOfWork> courseRepository, ILogger logger)
+            IBusinessRepositoryFacade<Course, UnitOfWork> courseRepository, ILogger logger, Interaction<string, bool> alert)
         {
             Data = data;
-            Parent = parent;
+            Security = security;
             CoachRepository = coachRepository;
             CourseRepository = courseRepository;
             Logger = logger;
             Load = ReactiveCommand.CreateFromTask(DoLoad);
+            Alert = alert;
+            AddLesson = ReactiveCommand.CreateFromTask<Lesson>(DoAddLesson);
+            RemoveLesson = ReactiveCommand.CreateFromTask<Guid>(DoRemoveLesson);
+            Save = ReactiveCommand.CreateFromTask(DoSave);
+
+        }
+        private async Task DoSave(CancellationToken token)
+        {
+            try
+            {
+                await CourseRepository.Update(Data, token: token);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, ex.Message);
+                await Alert.Handle(ex.Message).GetAwaiter();
+            }
+        }
+        private async Task DoRemoveLesson(Guid id, CancellationToken token)
+        {
+            try
+            {
+                var lesson = Data.Lessons.SingleOrDefault(x => x.Id == id);
+                if (lesson == null)
+                    throw new InvalidDataException();
+                Data.Lessons.Remove(lesson);
+                await DoSave(token);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, ex.Message);
+                await Alert.Handle(ex.Message).GetAwaiter();
+            }
+        }
+        private async Task DoAddLesson(Lesson lesson, CancellationToken token)
+        {
+            try
+            {
+                Data.Lessons.Add(lesson);
+                await CourseRepository.Update(Data, token: token);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, ex.Message);
+                await DoSave(token);
+            }
         }
         private async Task DoLoad(CancellationToken token)
         {
             try
             {
-                
+                var sec = await Security.GetPrincipal();
+                IsAdmin = sec?.IsInRole("Admin") == true || sec?.IsInRole($"Admin:Course:{Data.Id}") == true;
                 var coach = await CoachRepository.Get(Data.CoachId, token: token);
                 Coach = coach;
                 if (Data.InstanceId != null && coach != null)
@@ -99,8 +214,156 @@ namespace Courseware.Coach.ViewModels
             catch (Exception ex)
             {
                 Logger.LogError(ex, ex.Message);
+                await Alert.Handle(ex.Message).GetAwaiter();
+            }
+        }
+    }
+    public class AddLessonViewModel : ReactiveObject
+    {
+        public Interaction<string, bool> Alert { get; } = new Interaction<string, bool>();
+        private bool isOpen = false;
+        public bool IsOpen
+        {
+            get => isOpen;
+            set => this.RaiseAndSetIfChanged(ref isOpen, value);
+        }
+        private Lesson data = new Lesson();
+        public Lesson Data
+        {
+            get => data;
+            set => this.RaiseAndSetIfChanged(ref data, value);
+        }
+        public ReactiveCommand<Unit, Unit> Add { get; }
+        public ReactiveCommand<Unit, Unit> Open { get; }
+        public ReactiveCommand<Unit, Unit> Cancel { get; }
+        protected ILogger Logger { get; }
+        public CourseViewModel Parent { get; }
+        public AddLessonViewModel(CourseViewModel parent, ILogger logger)
+        {
+            Logger = logger;
+            Parent = parent;
+            Add = ReactiveCommand.CreateFromTask(DoAdd);
+            Open = ReactiveCommand.Create(() => { IsOpen = true; });
+            Cancel = ReactiveCommand.Create(() => { IsOpen = false; });
+        }
+        private async Task DoAdd(CancellationToken token)
+        {
+            try
+            {
+                await Parent.AddLesson.Execute(Data).GetAwaiter();
+                IsOpen = false;
+                Data = new Lesson();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, ex.Message);
+                await Alert.Handle(ex.Message).GetAwaiter();
+            }
+        }
+    }
+    public class LessonViewModel : ReactiveObject
+    {
+        public AddPromptViewModel AddPromptViewModel { get; }
+        public Lesson Data { get; }
+        protected ILogger Logger { get; }
+        public CourseViewModel Parent { get; }
+        public ObservableCollection<PromptViewModel> Prompts { get; } = new ObservableCollection<PromptViewModel>();
+        public ReactiveCommand<Prompt, Unit> AddPrompt { get; }
+        public ReactiveCommand<Guid, Unit> RemovePrompt { get; }
+        public LessonViewModel(Lesson data, CourseViewModel parent, ILogger logger)
+        {
+            Data = data;
+            Logger = logger;
+            Parent = parent;
+            foreach (var x in data.Prompts)
+                Prompts.Add(new PromptViewModel(x, this, logger));
+            AddPrompt = ReactiveCommand.CreateFromTask<Prompt>(DoAddPrompt);
+            RemovePrompt = ReactiveCommand.CreateFromTask<Guid>(DoRemovePrompt);
+            AddPromptViewModel = new AddPromptViewModel(this, logger);
+        }
+        private async Task DoRemovePrompt(Guid id, CancellationToken token)
+        {
+            try
+            {
+                var prompt = Data.Prompts.SingleOrDefault(x => x.Id == id);
+                if (prompt == null)
+                    throw new InvalidDataException();
+                Data.Prompts.Remove(prompt);
+                await Parent.Save.Execute().GetAwaiter();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, ex.Message);
                 await Parent.Alert.Handle(ex.Message).GetAwaiter();
             }
+        }
+        private async Task DoAddPrompt(Prompt prompt, CancellationToken token)
+        {
+            try
+            {
+                Data.Prompts.Add(prompt);
+                await Parent.Save.Execute().GetAwaiter();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, ex.Message);
+                await Parent.Alert.Handle(ex.Message).GetAwaiter();
+            }
+        }
+    }
+    public class AddPromptViewModel : ReactiveObject
+    {
+        public Interaction<string, bool> Alert { get; } = new Interaction<string, bool>();
+        private bool isOpen = false;
+        public bool IsOpen
+        {
+            get => isOpen;
+            set => this.RaiseAndSetIfChanged(ref isOpen, value);
+        }
+        private Prompt data = new Prompt();
+        public Prompt Data
+        {
+            get => data;
+            set => this.RaiseAndSetIfChanged(ref data, value);
+        }
+        public ReactiveCommand<Unit, Unit> Add { get; }
+        public ReactiveCommand<Unit, Unit> Open { get; }
+        public ReactiveCommand<Unit, Unit> Cancel { get; }
+        protected ILogger Logger { get; }
+        public LessonViewModel Parent { get; }
+        public AddPromptViewModel(LessonViewModel parent, ILogger logger)
+        {
+            Logger = logger;
+            Parent = parent;
+            Add = ReactiveCommand.CreateFromTask(DoAdd);
+            Open = ReactiveCommand.Create(() => { IsOpen = true; });
+            Cancel = ReactiveCommand.Create(() => { IsOpen = false; });
+        }
+        private async Task DoAdd(CancellationToken token)
+        {
+            try
+            {
+                await Parent.AddPrompt.Execute(Data).GetAwaiter();
+                IsOpen = false;
+                Data = new Prompt();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, ex.Message);
+                await Alert.Handle(ex.Message).GetAwaiter();
+            }
+        }
+    }
+    public class PromptViewModel : ReactiveObject
+    {
+        public Prompt Data { get; }
+        protected ILogger Logger { get; }
+        public LessonViewModel Parent { get; }
+        public PromptViewModel(Prompt data, LessonViewModel parent, ILogger logger)
+        {
+            Data = data;
+            Logger = logger;
+            Parent = parent;
         }
     }
     public class AddCourseViewModel : ReactiveObject, IDisposable
