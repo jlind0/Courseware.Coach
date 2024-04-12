@@ -1,0 +1,60 @@
+﻿@inherits ReactiveComponentBase<AddCourseViewModel>
+@if(ViewModel != null)
+{
+    <AlertView Alert="ViewModel.Alert" />
+    <h3>Courses <button class="btn btn-primary" @onclick="ViewModel.Open.BindCommand<MouseEventArgs>()"><i class="fa-solid fa-plus"></i></button></h3>
+    <TelerikDialog @bind-Visible="ViewModel.IsOpen" Title="Add Course">
+        <DialogContent>
+            <TelerikForm Model="ViewModel" OnValidSubmit="ViewModel.Add.BindCommand<EditContext>()">
+                <FormValidation>
+                    <DataAnnotationsValidator />
+                </FormValidation>
+                <FormItems>
+                    <FormItem Field="Data.Name" LabelText="Name" />
+                    <FormItem Field="Data.Description" LabelText="Description" />
+                    <FormItem Field="Data.Price" LabelText="Price" />
+                    <FormItem Field="Data.DaysToComplete" LabelText="Days to Complete" />
+                    <FormItem Field="SelectedCoachId" LabelText="Coach">
+                        <Template>
+                            <TelerikDropDownList @bind-Value="ViewModel.SelectedCoachId"
+                                                 Data="ViewModel.Coaches" TItem="Coach" TValue="Guid" ValueField="Id">
+                                <ItemTemplate>
+                                    @context.Name
+                                </ItemTemplate>
+                                <ValueTemplate>
+                                    @context.Name
+                                </ValueTemplate>
+                            </TelerikDropDownList>
+                        </Template>
+                    </FormItem>
+                    <FormItem Field="SelectedInstanceId" LabelText="Instance">
+                        <Template>
+                            <TelerikDropDownList @bind-Value="ViewModel.SelectedInstanceId"
+                                                 Data="ViewModel.Instances" TItem="CoachInstance" TValue="Guid?" ValueField="Id">
+                                <ItemTemplate>
+                                    @context.Name
+                                </ItemTemplate>
+                                <ValueTemplate>
+                                    @context.Name
+                                </ValueTemplate>
+                            </TelerikDropDownList>
+                        </Template>
+                    </FormItem>
+                </FormItems>
+            </TelerikForm>
+        </DialogContent>
+        <DialogButtons>
+            <TelerikButton OnClick="ViewModel.Cancel.BindCommand<MouseEventArgs>()">Cancel</TelerikButton>
+        </DialogButtons>
+    </TelerikDialog>
+}
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        if (ViewModel != null)
+        {
+            await ViewModel.Load.Execute().GetAwaiter();
+        }
+        await base.OnInitializedAsync();
+    }
+}

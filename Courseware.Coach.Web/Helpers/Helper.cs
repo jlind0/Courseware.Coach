@@ -18,6 +18,32 @@ namespace Courseware.Coach.Web.Helpers
 {
     public static class EventsToCommand
     {
+        public static EventCallback<GridReadEventArgs> BindReadCommand<TEntity, TViewModel>(
+           this ReactiveCommand<LoadParameters<TEntity>?, ViewModelQuery<TViewModel>?> command, object reciever)
+           where TEntity : Item, new()
+           where TViewModel : ReactiveObject
+        {
+            return EventCallback.Factory.Create<GridReadEventArgs>(reciever, async args =>
+            {
+                LoadParameters<TEntity> parameters = new LoadParameters<TEntity>();
+                if (args.Request.PageSize > 0)
+                    parameters.Pager = new Pager()
+                    {
+                        Page = args.Request.Page,
+                        Size = args.Request.PageSize
+                    };
+                if (args.Request.Sorts.Count > 0)
+                {
+                    parameters.OrderBy = args.Request.Sorts.ConvertSortDescriptors<TEntity>();
+                }
+                if (args.Request.Filters.Count > 0)
+                    parameters.Filter = args.Request.Filters.CombineFiltersIntoExpression<TEntity>();
+                var result = await command.Execute(parameters).GetAwaiter();
+                var data = result?.Data;
+                args.Data = data;
+                args.Total = result?.Count ?? 0;
+            });
+        }
         public static Func<IQueryable<TEntity>, IOrderedQueryable<TEntity>> ConvertSortDescriptors<TEntity>(this IList<SortDescriptor> sortDescriptors)
         {
             return query =>

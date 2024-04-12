@@ -101,7 +101,7 @@ namespace Courseware.Coach.Core
         public string Name { get; set; } = null!;
         [Required]
         public string Description { get; set; } = null!;
-        public Lesson[] Lessons { get; set; } = [];
+        public List<Lesson> Lessons { get; set; } = [];
         [Required]
         public decimal? Price { get; set; }
         public int DaysToComplete { get; set; } = 90;

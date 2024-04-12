@@ -1,0 +1,53 @@
+﻿@page "/admin/courses"
+@inject NavigationManager Nav
+@inherits ReactiveInjectableComponentBase<CoursesViewModel>
+@attribute [RoleAuthorization(Roles = "Admin")]
+@if (ViewModel != null)
+{
+    <AlertView Alert="ViewModel.Alert" />
+    <AddCourseView ViewModel="ViewModel.AddCourseViewModel"/>
+    <TelerikGrid @ref="grdRef" TItem="CourseViewModel" OnRead="ViewModel.Load.BindReadCommand<Course, CourseViewModel>(this)"
+       Sortable="true" FilterMode="GridFilterMode.FilterMenu" Pageable="true" PageSize="25">
+        <GridColumns>
+            <GridColumn Field="Data.Name" Title="Name"/>
+            <GridColumn Field="Coach.Name" Title="Coach">
+               <Template>
+                    <TelerikButton OnClick="() => RedirectCoach(((CourseViewModel)context).Coach!.Id)">
+                       @(((CourseViewModel)context).Coach!.Name)
+                   </TelerikButton>
+               </Template>
+            </GridColumn>
+            <GridColumn Field="CoachInstance.Name" Title="Instance"/>
+            <GridColumn Field="Data.Price" Title="Price"/>
+            <GridColumn Field="Data.DaysToComplete" Title="Days to Complete"/>
+            <GridColumn Field="Data.Id" Title="Open">
+                <Template>
+                    <TelerikButton OnClick="() => Redirect(((CourseViewModel)context).Data.Id)">...</TelerikButton>
+                </Template>
+            </GridColumn>
+        </GridColumns>
+    </TelerikGrid>
+}
+@code {
+    protected TelerikGrid<CourseViewModel> grdRef = null!;
+    protected void Reload()
+    {
+        grdRef.Rebind();
+    }
+    protected void RedirectCoach(Guid id)
+    {
+        Nav.NavigateTo($"/admin/coaches/{id}");
+    }
+    protected void Redirect(Guid id)
+    {
+        Nav.NavigateTo($"/admin/courses/{id}");
+    }
+    protected override async Task OnInitializedAsync()
+    {
+        if (ViewModel != null)
+        {
+            ViewModel.Reload = Reload;
+        }
+        await base.OnInitializedAsync();
+    }
+}

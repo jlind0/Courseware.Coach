@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
+using ReactiveUI;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -49,5 +50,11 @@ namespace Courseware.Coach.ViewModels
             }
             return null;
         }
+    }
+    public class ViewModelQuery<T>
+        where T : ReactiveObject
+    {
+        public ICollection<T> Data { get; set; } = null!;
+        public int Count { get; set; }
     }
 }
