@@ -1,0 +1,30 @@
+﻿@page "/admin/courses/{CourseId:guid}"
+@inject AuthenticationStateProvider AuthState
+@inherits ReactiveInjectableComponentBase<CourseLoaderViewModel>
+@if (ViewModel != null)
+{
+    <AlertView Alert="ViewModel.Alert" />
+    @if(ViewModel.Data != null)
+    {
+        <CourseAdminView ViewModel="ViewModel.Data" />
+    }
+    
+}
+
+@code {
+    [Parameter] public Guid CourseId { get; set; }
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthState.GetAuthenticationStateAsync();
+        bool isAuthed = authState.User?.IsInRole("Admin") == true || authState.User?.IsInRole($"Admin:Course:{CourseId}") == true;
+        if (!isAuthed)
+        {
+            throw new UnauthorizedAccessException();
+        }
+        if (ViewModel != null)
+        {
+            await ViewModel.Load.Execute(CourseId).GetAwaiter();
+        }
+        await base.OnInitializedAsync();
+    }
+}

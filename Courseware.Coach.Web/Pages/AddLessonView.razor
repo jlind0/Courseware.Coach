@@ -1,0 +1,24 @@
+﻿@inherits ReactiveComponentBase<AddLessonViewModel>
+@if (ViewModel != null)
+{
+    <AlertView Alert="ViewModel.Alert" />
+    <h3>Lessons <button class="btn btn-primary" @onclick="ViewModel.Open.BindCommand<MouseEventArgs>()"><i class="fa-solid fa-plus"></i></button></h3>
+    <TelerikDialog @bind-Visible="ViewModel.IsOpen" Title="Add Lesson">
+        <DialogContent>
+            <TelerikForm Model="ViewModel" OnValidSubmit="ViewModel.Add.BindCommand<EditContext>()">
+                <FormValidation>
+                    <DataAnnotationsValidator />
+                </FormValidation>
+                <FormItems>
+                    <FormItem Field="Data.Name" LabelText="Name" />
+                    <FormItem Field="Data.Order" LabelText="Order"/>
+                </FormItems>
+            </TelerikForm>
+        </DialogContent>
+        <DialogButtons>
+            <TelerikButton OnClick="ViewModel.Cancel.BindCommand<MouseEventArgs>()">Cancel</TelerikButton>
+        </DialogButtons>
+    </TelerikDialog>
+}
+@code {
+}

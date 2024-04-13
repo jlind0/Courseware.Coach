@@ -1,0 +1,22 @@
+﻿@inherits ReactiveComponentBase<AddPromptViewModel>
+@if (ViewModel != null)
+{
+    <AlertView Alert="ViewModel.Alert" />
+    <h3>Prompts <button class="btn btn-primary" @onclick="ViewModel.Open.BindCommand<MouseEventArgs>()"><i class="fa-solid fa-plus"></i></button></h3>
+    <TelerikDialog @bind-Visible="ViewModel.IsOpen" Title="Add Prompt">
+        <DialogContent>
+            <TelerikForm Model="ViewModel" OnValidSubmit="ViewModel.Add.BindCommand<EditContext>()">
+                <FormValidation>
+                    <DataAnnotationsValidator />
+                </FormValidation>
+                <FormItems>
+                    <FormItem Field="Data.Text" EditorType="FormEditorType.TextArea" LabelText="Text" />
+                    <FormItem Field="Data.Order" LabelText="Order" />
+                </FormItems>
+            </TelerikForm>
+        </DialogContent>
+        <DialogButtons>
+            <TelerikButton OnClick="ViewModel.Cancel.BindCommand<MouseEventArgs>()">Cancel</TelerikButton>
+        </DialogButtons>
+    </TelerikDialog>
+}

@@ -1,0 +1,76 @@
+﻿@inherits ReactiveComponentBase<CourseViewModel>
+@if(ViewModel != null)
+{
+    <TelerikForm Model="ViewModel" OnValidSubmit="ViewModel.Save.BindCommand<EditContext>()">
+        <FormValidation>
+            <DataAnnotationsValidator />
+        </FormValidation>
+        <FormItems>
+            <FormItem Field="Data.Name" LabelText="Name" />
+            <FormItem Field="Data.Description" EditorType="FormEditorType.TextArea" LabelText="Description" />
+            <FormItem Field="Data.Price" LabelText="Price" />
+            <FormItem Field="Data.DaysToComplete" LabelText="Days to Complete" />
+            <FormItem Field="Data.IsPublished" LabelText="Is Published"/>
+            <FormItem Field="SelectedCoachId" LabelText="Coach">
+                <Template>
+                    @ViewModel.Coach?.Name
+                </Template>
+            </FormItem>
+            <FormItem Field="SelectedInstanceId" LabelText="Instance">
+                <Template>
+                    @ViewModel.CoachInstance?.Name
+                </Template>
+            </FormItem>
+        </FormItems>
+    </TelerikForm>
+    <h4>Upload Thumbnail Image</h4>
+    <InputFile OnChange="ViewModel.UploadThumbnail.BindUploadBuiltInCommand(this)" accept=".jpg,.jpeg,.png,.gif,.bmp,.tiff,.svg,.webp" />
+    @if (!string.IsNullOrEmpty(ViewModel.Data.ThumbnailImageId))
+    {
+        <img src="/api/images/@(ViewModel.Data.ThumbnailImageId)" alt="Thumbnail Image" />
+    }
+    <h4>Upload Banner Image</h4>
+    <InputFile OnChange="ViewModel.UploadBanner.BindUploadBuiltInCommand(this)" accept=".jpg,.jpeg,.png,.gif,.bmp,.tiff,.svg,.webp" />
+    @if (!string.IsNullOrEmpty(ViewModel.Data.BannerImageId))
+    {
+        <img src="/api/images/@(ViewModel.Data.BannerImageId)" alt="Banner Image" />
+    }
+    <AddLessonView ViewModel="ViewModel.AddLessonVM"/>
+    @foreach(var lesson in ViewModel.Lessons)
+    {
+        <TelerikForm Model="lesson" OnValidSubmit="ViewModel.Save.BindCommand<EditContext>()">
+                        <FormValidation>
+                <DataAnnotationsValidator />
+            </FormValidation>
+            <FormItems>
+                <FormItem Field="Data.Name" LabelText="Name" />
+                <FormItem Field="Data.Order" LabelText="Order"/>
+            </FormItems>
+        </TelerikForm>
+        <AddPromptView ViewModel="lesson.AddPromptViewModel"/>
+        @foreach(var prompt in lesson.Prompts)
+        {
+            <TelerikForm Model="prompt" OnValidSubmit="ViewModel.Save.BindCommand<EditContext>()">
+                <FormValidation>
+                    <DataAnnotationsValidator />
+                </FormValidation>
+                <FormItems>
+                    <FormItem Field="Data.Text" EditorType="FormEditorType.TextArea" LabelText="Text" />
+                    <FormItem Field="Data.Order" LabelText="Order"/>
+                </FormItems>
+            </TelerikForm>
+        }
+    }
+}
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        if(ViewModel != null)
+        {
+            ViewModel.Reload = () => this.StateHasChanged();
+            await ViewModel.Load.Execute().GetAwaiter();
+        }
+        await base.OnInitializedAsync();
+    }
+}
