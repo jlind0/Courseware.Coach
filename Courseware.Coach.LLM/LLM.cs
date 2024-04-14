@@ -304,6 +304,7 @@ namespace Courseware.Coach.LLM
                 throw new InvalidOperationException("No conversation started");
             if(CurrentCoach == null)
                 throw new InvalidOperationException("No coach started");
+            message = $"{CurrentPrompt.Text} {message}";
             if (CurrentCoachInstance == null)
                 await ChatWithCoach(message, token);
             else

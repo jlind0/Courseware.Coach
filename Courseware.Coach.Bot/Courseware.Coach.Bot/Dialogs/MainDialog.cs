@@ -178,10 +178,10 @@ namespace Courseware.Coach.Bot.Dialogs
             if(lesson == null)
             {
                 await stepContext.Context.SendActivityAsync(MessageFactory.Text("No lesson available."), token);
-                return await stepContext.BeginDialogAsync(nameof(MainMenu), null, token);
+                return await stepContext.ReplaceDialogAsync(nameof(MainMenu), null, token);
             }
             await stepContext.Context.SendActivityAsync(MessageFactory.Text(lesson.Name), token);
-            return await stepContext.BeginDialogAsync(FollowPrompts, null, token);
+            return await stepContext.ReplaceDialogAsync(FollowPrompts, null, token);
         }
         protected async Task<DialogTurnResult> StartLessonPrompt(WaterfallStepContext stepContext, CancellationToken token)
         {
