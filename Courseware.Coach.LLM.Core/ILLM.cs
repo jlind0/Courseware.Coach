@@ -33,14 +33,15 @@ namespace Courseware.Coach.LLM.Core
         Task<User?> Login(string objectId, CancellationToken token = default);
         Task<CH?> StartConversationWithCoach(Guid coachId, CancellationToken token = default);
         Task<CoachInstance?> StartConversationWithCoachInstance(Guid coachId, CancellationToken token = default);
-        Task<Course?> PreviewCourse(Guid courseId, CancellationToken token = default);
         Task<Subscription?> SubscribeToCoach(Guid coachId, CancellationToken token = default);
         Task<Subscription?> SubscribeToCourse(Guid courseId, CancellationToken token = default);
         Task ChatWithCoach(string message, CancellationToken token = default);
         Task ChatWithCoachInstance(string message, CancellationToken token = default);
-        ISourceBlock<Lesson> FollowLessons(ISourceBlock<bool> moveBlock, CancellationToken token = default);
-        ISourceBlock<Prompt> FollowPrompts(ISourceBlock<Lesson> moveBlock, CancellationToken token = default);
         Task EndConversation(CancellationToken token = default);
+        Lesson? GetNextLesson();
+        Prompt? GetNextPrompt();
+        Task<Course?> StartCourse(Guid courseId, CancellationToken token = default);
+        Task SendMessageForCurrentPrompt(string message, CancellationToken token = default);
     }
     
 }

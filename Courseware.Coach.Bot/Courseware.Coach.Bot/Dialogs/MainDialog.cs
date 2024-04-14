@@ -69,11 +69,13 @@ namespace Courseware.Coach.Bot.Dialogs
         protected string IssuerUrl { get; }
         protected LLMFactory Factory { get; }
         protected IBotFrameworkHttpAdapter Adapter { get; }
+        protected IRepository<UnitOfWork, Course> CourseRepository { get; }
         // Dependency injection uses this constructor to instantiate MainDialog
-        public MainDialog(ILogger<MainDialog> logger, IConfiguration config, LLMFactory factory, IBotFrameworkHttpAdapter adapter, IRepository<UnitOfWork, CH> coachRepository)
+        public MainDialog(ILogger<MainDialog> logger, IConfiguration config, LLMFactory factory, IBotFrameworkHttpAdapter adapter, IRepository<UnitOfWork, CH> coachRepository, IRepository<UnitOfWork, Course> courseRepository)
             : base(nameof(MainDialog))
         { 
             Logger = logger;
+            CourseRepository = courseRepository;
             Logger.LogInformation("MainDialog constructor called.");
             MetadataUrl = config["Security:MetadataUrl"];
             IssuerUrl = config["Security:Issuer"];
@@ -94,17 +96,45 @@ namespace Courseware.Coach.Bot.Dialogs
             var waterfallSteps = new WaterfallStep[]
             {
                 InitialStepAsync,
-                HandleAuthenticationResultAsync,
-                DisplayCoachesStep,
-                HandleCoachChoiceResultAsync
+                HandleAuthenticationResultAsync
             };
             var coachSteps = new WaterfallStep[] {
                 StartTalkToCoach,
                 RecieveTalkToCoach,
-                LoopBackStep
+                LoopBackChatWithCoachStep
+            };
+            var mainMenuSteps = new WaterfallStep[]
+            {
+                MainMenuOptions,
+                MainMenuChoice
+            };
+            var pickCoachSteps = new WaterfallStep[]
+            {
+                DisplayCoachesStep,
+                HandleCoachChoiceResultAsync
+            };
+            var pickCourseSteps = new WaterfallStep[]
+            {
+                DisplayCoursesStep,
+                HandleCourseChoiceResultAsync
+            };
+            var takeLessonSteps = new WaterfallStep[]
+            {
+                StartLesson
+            };
+            var followPromptsSteps = new WaterfallStep[]
+            {
+                StartLessonPrompt,
+                RecieveLessonPrompt,
+                LoopBackLessonPrompt
             };
             AddDialog(new WaterfallDialog(LoginPickCoach, waterfallSteps));
             AddDialog(new WaterfallDialog(ChatWithCoach, coachSteps));
+            AddDialog(new WaterfallDialog(MainMenu, mainMenuSteps));
+            AddDialog(new WaterfallDialog(PickCoach, pickCoachSteps));
+            AddDialog(new WaterfallDialog(PickCourse, pickCourseSteps));
+            AddDialog(new WaterfallDialog(TakeLesson, takeLessonSteps));
+            AddDialog(new WaterfallDialog(FollowPrompts, followPromptsSteps));
             AddDialog(new TextPrompt(nameof(TextPrompt)));
             AddDialog(new ChoicePrompt(nameof(ChoicePrompt)));
             InitialDialogId = LoginPickCoach;
@@ -112,7 +142,12 @@ namespace Courseware.Coach.Bot.Dialogs
         }
         protected const string LoginPickCoach = nameof(LoginPickCoach);
         protected const string ChatWithCoach = nameof(ChatWithCoach);
-        private async Task<DialogTurnResult> LoopBackStep(WaterfallStepContext stepContext, CancellationToken cancellationToken)
+        protected const string MainMenu = nameof(MainMenu);
+        protected const string PickCoach = nameof(PickCoach);
+        protected const string PickCourse = nameof(PickCourse);
+        protected const string TakeLesson = nameof(TakeLesson);
+        protected const string FollowPrompts = nameof(FollowPrompts);
+        private async Task<DialogTurnResult> LoopBackChatWithCoachStep(WaterfallStepContext stepContext, CancellationToken cancellationToken)
         {
             // Optionally add a condition to break out of the loop
             return await stepContext.ReplaceDialogAsync(ChatWithCoach, null, cancellationToken);
@@ -135,6 +170,47 @@ namespace Courseware.Coach.Bot.Dialogs
             }
             return await stepContext.NextAsync(null, cancellationToken);
 
+        }
+        protected async Task<DialogTurnResult> StartLesson(WaterfallStepContext stepContext, CancellationToken token)
+        {
+            var LLM = Factory.GetLLM(stepContext.Context.Activity.Conversation.Id);
+            var lesson = LLM.GetNextLesson();
+            if(lesson == null)
+            {
+                await stepContext.Context.SendActivityAsync(MessageFactory.Text("No lesson available."), token);
+                return await stepContext.BeginDialogAsync(nameof(MainMenu), null, token);
+            }
+            await stepContext.Context.SendActivityAsync(MessageFactory.Text(lesson.Name), token);
+            return await stepContext.BeginDialogAsync(FollowPrompts, null, token);
+        }
+        protected async Task<DialogTurnResult> StartLessonPrompt(WaterfallStepContext stepContext, CancellationToken token)
+        {
+            var LLM = Factory.GetLLM(stepContext.Context.Activity.Conversation.Id);
+            var prompt = LLM.GetNextPrompt();
+            if (prompt == null)
+            {
+                return await stepContext.BeginDialogAsync(nameof(TakeLesson), null, token);
+            }
+            await stepContext.Context.SendActivityAsync(MessageFactory.Text(prompt.Text), token);
+            return await stepContext.PromptAsync(nameof(TextPrompt), new PromptOptions { }, token);
+        }
+        protected async Task<DialogTurnResult> RecieveLessonPrompt(WaterfallStepContext stepContext, CancellationToken token)
+        {
+            var LLM = Factory.GetLLM(stepContext.Context.Activity.Conversation.Id);
+            var msg = stepContext.Result as string;
+            if (msg == null)
+            {
+                await stepContext.Context.SendActivityAsync(MessageFactory.Text("No message received."), token);
+            }
+            else
+            {
+                await LLM.SendMessageForCurrentPrompt(msg, token);
+            }
+            return await stepContext.NextAsync(null, token);
+        }
+        protected async Task<DialogTurnResult> LoopBackLessonPrompt(WaterfallStepContext stepContext, CancellationToken token)
+        {
+            return await stepContext.ReplaceDialogAsync(FollowPrompts, null, token);
         }
         protected override async Task<DialogTurnResult> OnBeginDialogAsync(DialogContext innerDc, object options, CancellationToken cancellationToken = default(CancellationToken))
         {
@@ -173,6 +249,10 @@ namespace Courseware.Coach.Bot.Dialogs
                     await innerDc.Context.SendActivityAsync(MessageFactory.Text("You have been signed out."), cancellationToken);
                     return await innerDc.CancelAllDialogsAsync(cancellationToken);
                 }
+                else if(text == "/main")
+                {
+                    return await innerDc.ReplaceDialogAsync(MainMenu, null, cancellationToken);
+                }
             }
 
             return null;
@@ -205,7 +285,7 @@ namespace Courseware.Coach.Bot.Dialogs
         }
         private async Task<DialogTurnResult> InitialStepAsync(WaterfallStepContext stepContext, CancellationToken cancellationToken)
         {
-            await stepContext.Context.SendActivityAsync(MessageFactory.Text("Welcome to Coursware Couch! Please wait while we try to log you in."), cancellationToken);
+            await stepContext.Context.SendActivityAsync(MessageFactory.Text("Welcome to Coursware Coach! Please wait while we try to log you in."), cancellationToken);
             return await stepContext.PromptAsync(nameof(OAuthPrompt), new PromptOptions { }, cancellationToken);
         }
         private async Task<DialogTurnResult> DisplayCoachesStep(WaterfallStepContext stepContext, CancellationToken cancellationToken)
@@ -223,6 +303,45 @@ namespace Courseware.Coach.Bot.Dialogs
                 Choices = ChoiceFactory.ToChoices(coaches.Items.Select(c => c.Name).ToList()),
             };
             return await stepContext.PromptAsync(nameof(ChoicePrompt), options, cancellationToken);
+        }
+        private async Task<DialogTurnResult> DisplayCoursesStep(WaterfallStepContext stepContext, CancellationToken cancellationToken)
+        {
+            var coaches = await CourseRepository.Get(token: cancellationToken);
+            if (coaches.Items.Count == 0)
+            {
+                await stepContext.Context.SendActivityAsync(MessageFactory.Text("No courses available."), cancellationToken);
+                return await stepContext.EndDialogAsync(null, cancellationToken);
+            }
+            var options = new PromptOptions
+            {
+                Prompt = MessageFactory.Text("Please select a course."),
+                RetryPrompt = MessageFactory.Text("That was not a valid choice, please select a course or type 'cancel'."),
+                Choices = ChoiceFactory.ToChoices(coaches.Items.Select(c => c.Name).ToList()),
+            };
+            return await stepContext.PromptAsync(nameof(ChoicePrompt), options, cancellationToken);
+        }
+        private async Task<DialogTurnResult> MainMenuOptions(WaterfallStepContext stepContext, CancellationToken cancellationToken)
+        {
+            var options = new PromptOptions
+            {
+                Prompt = MessageFactory.Text("Please select a mode."),
+                RetryPrompt = MessageFactory.Text("That was not a valid choice, please select a coach or type 'cancel'."),
+                Choices = ChoiceFactory.ToChoices(["Coach", "Course"]),
+            };
+            return await stepContext.PromptAsync(nameof(ChoicePrompt), options, cancellationToken);
+        }
+        private async Task<DialogTurnResult> MainMenuChoice(WaterfallStepContext stepContext, CancellationToken cancellationToken)
+        {
+            var choice = (FoundChoice)stepContext.Result;
+            if(choice.Value == "Coach")
+            {
+                return await stepContext.ReplaceDialogAsync(PickCoach, null, cancellationToken);
+            }
+            else if(choice.Value == "Course")
+            {
+                return await stepContext.ReplaceDialogAsync(PickCourse, null, cancellationToken);
+            }
+            return await stepContext.ReplaceDialogAsync(MainMenu, null, cancellationToken);
         }
         private async Task<DialogTurnResult> HandleCoachChoiceResultAsync(WaterfallStepContext stepContext, CancellationToken cancellationToken)
         {
@@ -248,6 +367,30 @@ namespace Courseware.Coach.Bot.Dialogs
             // Continue the dialog or end it depending on your application's flow
             return await stepContext.ReplaceDialogAsync(ChatWithCoach, null, cancellationToken);
         }
+        private async Task<DialogTurnResult> HandleCourseChoiceResultAsync(WaterfallStepContext stepContext, CancellationToken cancellationToken)
+        {
+            var choice = (FoundChoice)stepContext.Result;
+
+            var coaches = await CourseRepository.Get(filter: c => c.Name == choice.Value, token: cancellationToken);
+            if (coaches.Items.Count == 0)
+            {
+                await stepContext.Context.SendActivityAsync(MessageFactory.Text("Course not found."), cancellationToken);
+                return await stepContext.EndDialogAsync(null, cancellationToken);
+            }
+            var LLM = Factory.GetLLM(stepContext.Context.Activity.Conversation.Id);
+            if (!LLM.IsLoggedIn)
+            {
+                await stepContext.Context.SendActivityAsync(MessageFactory.Text("Not logged in."), cancellationToken);
+            }
+            await LLM.StartCourse(coaches.Items.Single().Id, cancellationToken);
+            if (LLM.CurrentConversationId == null)
+            {
+                await stepContext.Context.SendActivityAsync(MessageFactory.Text("Failed to start conversation with coach."), cancellationToken);
+                return await stepContext.EndDialogAsync(null, cancellationToken);
+            }
+            // Continue the dialog or end it depending on your application's flow
+            return await stepContext.ReplaceDialogAsync(TakeLesson, null, cancellationToken);
+        }
         private async Task<DialogTurnResult> HandleAuthenticationResultAsync(WaterfallStepContext stepContext, CancellationToken cancellationToken)
         {
             var LLM = Factory.GetLLM(stepContext.Context.Activity.Conversation.Id);
@@ -266,12 +409,12 @@ namespace Courseware.Coach.Bot.Dialogs
                     await stepContext.Context.SendActivityAsync(MessageFactory.Text($"Welcome {user.FirstName}!"), cancellationToken);
                 }
                 // User is authenticated
-                return await stepContext.NextAsync(result, cancellationToken);
+                return await stepContext.ReplaceDialogAsync(MainMenu, null, cancellationToken);
             }
 
             // Authentication failed
             await stepContext.Context.SendActivityAsync(MessageFactory.Text("Authentication failed. Please try again."), cancellationToken);
-            return await stepContext.NextAsync(null, cancellationToken);
+            return await stepContext.ReplaceDialogAsync(LoginPickCoach, null, cancellationToken);
         }
         protected async Task<string?> GetAzureADB2CPublicKey()
         {

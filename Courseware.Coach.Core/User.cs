@@ -145,7 +145,7 @@ namespace Courseware.Coach.Core
     public class Subscription
     { 
         public Guid Id { get; set; } = Guid.NewGuid();
-        public Guid? ConversationId { get; set; }
+        public string? ConversationId { get; set; }
         public Guid? CourseId { get; set; }
         public Guid? CoachId { get; set; }
         public bool IsFunded { get; set; }

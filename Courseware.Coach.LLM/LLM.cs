@@ -85,7 +85,7 @@ namespace Courseware.Coach.LLM
         public ISourceBlock<CloneResponse> Conversation { get => BrodcastConversation; }
 
         protected BroadcastBlock<byte[]> BrodcastAudioConversation { get; }
-
+        protected ILookup<int, Lesson>? Lessons { get; set; }
         public ISourceBlock<byte[]> AudioConversation{ get => BrodcastAudioConversation; }
 
         protected ICloneAI CloneAI { get; }
@@ -129,6 +129,11 @@ namespace Courseware.Coach.LLM
             if (CurrentConversationId == null)
                 throw new InvalidOperationException("No conversation started");
             Logger.LogInformation($"Current Conversation Id : {CurrentConversationId}");
+            string effectiveLocale = CurrentLocale ?? CurrentSubscription?.Locale ?? CurrentUser?.Locale ?? "en-US";
+            if (effectiveLocale != CurrentCoach.NativeLocale)
+            {
+                message = await Translation.Translate(message, effectiveLocale, CurrentCoach.NativeLocale, token);
+            }
             var resp = await CloneAI.GenerateResponse(CurrentCoach.APIKey, new ConversationRequestBody()
             {
                 conversation_id = CurrentConversationId,
@@ -175,13 +180,15 @@ namespace Courseware.Coach.LLM
                 throw new InvalidOperationException("No coach or conversation started");
             if(CurrentCoachInstance == null)
                 throw new InvalidOperationException("No coach instance or conversation started");
-            if (CurrentSubscription == null && CurrentCoach.Price > 0)
-                throw new InvalidOperationException("No subscription");
             if (CurrentConversationId == null)
                 await StartConversationWithCoachInstance(CurrentCoachInstance.Id, token);
             if (CurrentConversationId == null)
                 throw new InvalidOperationException("No conversation started");
-            
+            string effectiveLocale = CurrentLocale ?? CurrentSubscription?.Locale ?? CurrentUser?.Locale ?? "en-US";
+            if(effectiveLocale != CurrentCoach.NativeLocale)
+            {
+                message = await Translation.Translate(message, effectiveLocale, CurrentCoach.NativeLocale, token);
+            }
             var resp = await CloneAI.GenerateResponse(CurrentCoach.APIKey, new ConversationRequestBody() 
                 { 
                     conversation_id = CurrentConversationId, 
@@ -191,7 +198,117 @@ namespace Courseware.Coach.LLM
             if (resp != null)
                 await PushText(resp, CurrentCoachInstance.NativeLocale, CurrentCoachInstance.DefaultVoiceName, token);
         }
-
+        public async Task<Course?> StartCourse(Guid courseId, CancellationToken token = default)
+        {
+            Reset();
+            CurrentCourse = await CourseRepo.Get(courseId, token: token);
+            if (CurrentCourse == null)
+                throw new InvalidOperationException("Course not found");
+            CurrentCoach = await CoachRepo.Get(CurrentCourse.CoachId, token: token);
+            if (CurrentCoach == null)
+                throw new InvalidOperationException("Coach not found");
+            if(CurrentCourse.InstanceId != null)
+            {
+                CurrentCoachInstance = CurrentCoach.Instances.SingleOrDefault(i => i.Id == CurrentCourse.InstanceId);
+                if (CurrentCoachInstance == null)
+                    throw new InvalidOperationException("Coach instance not found");
+            }
+            if (CurrentUser != null)
+            {
+                CurrentSubscription = await SubscriptionManager.GetCurrentSubscriptionForCourse(courseId, CurrentUser.ObjectId, token);
+                string effectiveLocale = CurrentLocale ?? CurrentSubscription?.Locale ?? CurrentUser.Locale;
+                if(CurrentCoach.NativeLocale != effectiveLocale)
+                {
+                    foreach(var lesson in CurrentCourse.Lessons)
+                    {
+                        lesson.Name = await Translation.Translate(lesson.Name, CurrentCoach.NativeLocale, effectiveLocale, token);
+                        foreach(var prompt in lesson.Prompts)
+                        {
+                            prompt.Text = await Translation.Translate(prompt.Text, CurrentCoach.NativeLocale, effectiveLocale, token);
+                        }
+                    }
+                }
+            }
+            if (CurrentSubscription?.ConversationId != null)
+            {
+                CurrentConversationId = CurrentSubscription.ConversationId;
+            }
+            if(CurrentSubscription?.CurrentLessonId != null)
+            {
+                CurrentLesson = CurrentCourse.Lessons.SingleOrDefault(l => l.Id == CurrentSubscription.CurrentLessonId);
+            }
+            if (CurrentConversationId == null)
+            {
+                NewConversationResponse? resp = null;
+                if (CurrentCoachInstance != null)
+                    resp = await CloneAI.StartConversation(CurrentCoach.APIKey, CurrentCoach.Slug, CurrentCoachInstance.Slug, CurrentUser?.Email, token);
+                else
+                    resp = await CloneAI.StartConversation(CurrentCoach.APIKey, CurrentCoach.Slug, null, CurrentUser?.Email, token);
+                CurrentConversationId = resp?.@new.conversation_id;
+                if (CurrentSubscription != null)
+                {
+                    CurrentSubscription.ConversationId = CurrentConversationId;
+                    await SubscriptionManager.UpdateSubscription(CurrentSubscription, CurrentUser!.ObjectId, token);
+                }
+            }
+            if (CurrentConversationId == null)                
+                throw new InvalidOperationException("Conversation not started");
+            return CurrentCourse;
+        }
+        public Lesson? GetNextLesson()
+        {
+            CurrentPrompt = null;
+            if (CurrentCourse == null)
+                throw new InvalidOperationException("Course not started");
+            if (CurrentLesson == null)
+            {
+                CurrentLesson = CurrentCourse.Lessons.OrderBy(l => l.Order).FirstOrDefault();
+                return CurrentLesson;
+            }
+            foreach(var lesson in CurrentCourse.Lessons.OrderBy(l => l.Order))
+            {
+                if (lesson.Id != CurrentLesson.Id && lesson.Order >= CurrentLesson.Order)
+                {
+                    CurrentLesson = lesson;
+                    return lesson;
+                }
+            }
+            return null;
+        }
+        public Prompt? GetNextPrompt()
+        {
+            if (CurrentCourse == null)
+                throw new InvalidOperationException("Course not started");
+            if (CurrentLesson == null)
+                throw new InvalidOperationException("Lesson not started");
+            if(CurrentPrompt == null)
+            {
+                CurrentPrompt = CurrentLesson.Prompts.OrderBy(p => p.Order).FirstOrDefault();
+                return CurrentPrompt;
+            }
+            foreach(var prompt in CurrentLesson.Prompts.OrderBy(p => p.Order))
+            {
+                if(prompt.Id != CurrentPrompt.Id && prompt.Order >= CurrentPrompt.Order)
+                {
+                    CurrentPrompt = prompt;
+                    return prompt;
+                }
+            }
+            return null;
+        }
+        public async Task SendMessageForCurrentPrompt(string message, CancellationToken token = default)
+        {
+            if(CurrentPrompt == null)
+                throw new InvalidOperationException("No prompt started");
+            if(CurrentConversationId == null)
+                throw new InvalidOperationException("No conversation started");
+            if(CurrentCoach == null)
+                throw new InvalidOperationException("No coach started");
+            if (CurrentCoachInstance == null)
+                await ChatWithCoach(message, token);
+            else
+                await ChatWithCoachInstance(message, token);
+        }
         public async ValueTask DisposeAsync()
         {
             BrodcastAudioConversation.Complete();
@@ -206,56 +323,6 @@ namespace Courseware.Coach.LLM
             return Task.CompletedTask;
         }
 
-        public ISourceBlock<Lesson> FollowLessons(ISourceBlock<bool> moveBlock, CancellationToken token = default)
-        {
-            if (CurrentCourse?.Lessons == null)
-                throw new InvalidOperationException("No course or lessons available.");
-
-            var lessonsLookup = CurrentCourse.Lessons.ToLookup(l => l.Order).OrderBy(l => l.Key);
-            var lessonsEnumerator = lessonsLookup.GetEnumerator();
-
-            if (!lessonsEnumerator.MoveNext())
-                throw new InvalidOperationException("No lessons to follow.");
-
-            var bufferBlock = new BufferBlock<Lesson>(new DataflowBlockOptions { CancellationToken = token });
-            int currentLessonOrder = lessonsEnumerator.Current.Key;
-
-            moveBlock.LinkTo(new ActionBlock<bool>(async _ =>
-            {
-                if (lessonsEnumerator.Current != null)
-                {
-                    foreach (var lesson in lessonsEnumerator.Current)
-                    {
-                        await bufferBlock.SendAsync(lesson, token);
-                    }
-
-                    if (!lessonsEnumerator.MoveNext())
-                    {
-                        bufferBlock.Complete(); // No more lessons, complete the block
-                    }
-                }
-            }), new DataflowLinkOptions { PropagateCompletion = true });
-
-            return bufferBlock;
-
-        }
-
-        public ISourceBlock<Prompt> FollowPrompts(ISourceBlock<Lesson> moveBlock, CancellationToken token = default)
-        {
-            var bufferBlock = new BufferBlock<Prompt>(new DataflowBlockOptions { CancellationToken = token });
-            moveBlock.LinkTo(new ActionBlock<Lesson>(async lesson =>
-            {
-                if (lesson.Prompts != null)
-                {
-                    foreach (var prompt in lesson.Prompts)
-                    {
-                        await bufferBlock.SendAsync(prompt, token);
-                    }
-                }
-                bufferBlock.Complete();
-            }), new DataflowLinkOptions { PropagateCompletion = true });
-            return bufferBlock;
-        }
         public async Task<User?> Login(string objectId, CancellationToken token = default)
         {
             if (!IsLoggedIn)
