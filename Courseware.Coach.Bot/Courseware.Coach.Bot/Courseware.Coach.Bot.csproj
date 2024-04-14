@@ -16,10 +16,25 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Mvc.NewtonsoftJson" Version="3.1.1" />
-    <PackageReference Include="Microsoft.Bot.Builder.AI.Luis" Version="4.22.0" />
-    <PackageReference Include="Microsoft.Bot.Builder.Dialogs" Version="4.22.0" />
-    <PackageReference Include="Microsoft.Bot.Builder.Integration.AspNet.Core" Version="4.22.0" />
+    <PackageReference Include="Microsoft.Bot.Builder.Dialogs" Version="4.22.2" />
+    <PackageReference Include="Microsoft.Bot.Builder.Integration.AspNet.Core" Version="4.22.2" />
     <PackageReference Include="Microsoft.Recognizers.Text.DataTypes.TimexExpression" Version="1.4.0" />
+    <PackageReference Include="Stripe.net" Version="44.1.0" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="7.5.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Courseware.Coach.Business.Core\Courseware.Coach.Business.Core.csproj" />
+    <ProjectReference Include="..\..\Courseware.Coach.Business\Courseware.Coach.Business.csproj" />
+    <ProjectReference Include="..\..\Courseware.Coach.Core\Courseware.Coach.Core.csproj" />
+    <ProjectReference Include="..\..\Courseware.Coach.Data.Core\Courseware.Coach.Data.Core.csproj" />
+    <ProjectReference Include="..\..\Courseware.Coach.Data\Courseware.Coach.Data.csproj" />
+    <ProjectReference Include="..\..\Courseware.Coach.LLM.Core\Courseware.Coach.LLM.Core.csproj" />
+    <ProjectReference Include="..\..\Courseware.Coach.LLM\Courseware.Coach.LLM.csproj" />
+    <ProjectReference Include="..\..\Courseware.Coach.Storage.Core\Courseware.Coach.Storage.Core.csproj" />
+    <ProjectReference Include="..\..\Courseware.Coach.Storage\Courseware.Coach.Storage.csproj" />
+    <ProjectReference Include="..\..\Courseware.Coach.Subscriptions.Core\Courseware.Coach.Subscriptions.Core.csproj" />
+    <ProjectReference Include="..\..\Courseware.Coach.Subscriptions\Courseware.Coach.Subscriptions.csproj" />
   </ItemGroup>
 
   <ItemGroup>

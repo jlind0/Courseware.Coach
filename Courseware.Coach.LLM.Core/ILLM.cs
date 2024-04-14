@@ -14,7 +14,7 @@ namespace Courseware.Coach.LLM.Core
 {
     public interface ILLM : IAsyncDisposable, INotifyPropertyChanged, INotifyPropertyChanging
     {
-        Guid? CurrentConversationId { get; }
+        string? CurrentConversationId { get; }
         Subscription? CurrentSubscription { get; }
         CH? CurrentCoach { get; }
         CoachInstance? CurrentCoachInstance { get; }
@@ -25,8 +25,8 @@ namespace Courseware.Coach.LLM.Core
         bool IsLoggedIn { get; }
         string? CurrentVoiceName { get; }
         string? CurrentLocale { get; }
-        ITargetBlock<CloneResponse> Conversation { get; }
-        ITargetBlock<byte[]> AudioConversation { get; }
+        ISourceBlock<CloneResponse> Conversation { get; }
+        ISourceBlock<byte[]> AudioConversation { get; }
         Task<bool> SetLocale(string locale = "en-US", CancellationToken token = default);
         Task<bool> SetVoiceName(string voiceName, CancellationToken token = default);
         Task<User?> Register(User user, CancellationToken token = default);
@@ -38,8 +38,8 @@ namespace Courseware.Coach.LLM.Core
         Task<Subscription?> SubscribeToCourse(Guid courseId, CancellationToken token = default);
         Task ChatWithCoach(string message, CancellationToken token = default);
         Task ChatWithCoachInstance(string message, CancellationToken token = default);
-        ITargetBlock<Lesson> FollowLessons(ISourceBlock<bool> moveBlock, CancellationToken token = default);
-        ITargetBlock<Prompt> FollowPrompts(ISourceBlock<Lesson> moveBlock, CancellationToken token = default);
+        ISourceBlock<Lesson> FollowLessons(ISourceBlock<bool> moveBlock, CancellationToken token = default);
+        ISourceBlock<Prompt> FollowPrompts(ISourceBlock<Lesson> moveBlock, CancellationToken token = default);
         Task EndConversation(CancellationToken token = default);
     }
     

@@ -1,156 +1,266 @@
 ﻿// Generated with Bot Builder V4 SDK Template for Visual Studio CoreBot v4.22.0
 
 using Courseware.Coach.Bot;
-using Courseware.Coach.Bot.CognitiveModels;
+using Courseware.Coach.Core;
+using Courseware.Coach.Data;
+using Courseware.Coach.Data.Core;
+using Courseware.Coach.LLM;
+using Courseware.Coach.LLM.Core;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Bot.Builder;
 using Microsoft.Bot.Builder.Dialogs;
+using Microsoft.Bot.Builder.Dialogs.Choices;
+using Microsoft.Bot.Builder.Integration.AspNet.Core;
 using Microsoft.Bot.Schema;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.IdentityModel.Tokens;
 using Microsoft.Recognizers.Text.DataTypes.TimexExpression;
+using Microsoft.Recognizers.Text.NumberWithUnit.English;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
+using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Threading.Tasks.Dataflow;
+using CH = Courseware.Coach.Core.Coach;
 
 namespace Courseware.Coach.Bot.Dialogs
 {
+    public class LLMFactory
+    {
+        protected IServiceProvider Provider { get; }
+        protected Dictionary<string, ILLM> LLMs { get; } = new Dictionary<string, ILLM>();  
+        public LLMFactory(IServiceProvider provider)
+        {
+            Provider = provider;
+        }
+        public ILLM GetLLM(string id, ActionBlock<CloneResponse> response)
+        {
+            if(LLMs.ContainsKey(id))
+            {
+                return LLMs[id];
+            }
+            LLMs[id] = Provider.GetRequiredService<ILLM>();
+            LLMs[id].Conversation.LinkTo(response); 
+            return LLMs[id];
+        }
+    }
     public class MainDialog : ComponentDialog
     {
-        private readonly ILogger _logger;
-        private readonly FlightBookingRecognizer _luisRecognizer;
-
+        protected ILogger Logger { get; }
+        protected string ConnectionName { get; }
+        protected ConversationReference? ConvRef { get; private set; }
+        protected IRepository<UnitOfWork, CH> CoachRepository { get; }
+        protected string MetadataUrl { get; }
+        protected string IssuerUrl { get; }
+        protected LLMFactory Factory { get; }
+        protected IBotFrameworkHttpAdapter Adapter { get; }
         // Dependency injection uses this constructor to instantiate MainDialog
-        public MainDialog(FlightBookingRecognizer luisRecognizer, BookingDialog bookingDialog, ILogger<MainDialog> logger)
+        public MainDialog(ILogger<MainDialog> logger, IConfiguration config, LLMFactory factory, IBotFrameworkHttpAdapter adapter, IRepository<UnitOfWork, CH> coachRepository)
             : base(nameof(MainDialog))
-        {
-            _luisRecognizer = luisRecognizer;
-            _logger = logger;
-
-            AddDialog(new TextPrompt(nameof(TextPrompt)));
-            AddDialog(bookingDialog);
-
+        { 
+            Logger = logger;
+            Logger.LogInformation("MainDialog constructor called.");
+            MetadataUrl = config["Security:MetadataUrl"];
+            IssuerUrl = config["Security:Issuer"];
+            Factory = factory;
+            CoachRepository = coachRepository;
+            Adapter = adapter;
+            ConnectionName = config["ConnectionName"];
+            
+            AddDialog(new OAuthPrompt(
+                nameof(OAuthPrompt),
+                new OAuthPromptSettings
+                {
+                    ConnectionName = ConnectionName,
+                    Text = "Please Sign In",
+                    Title = "Sign In",
+                    Timeout = 300000, // User has 5 minutes to login (1000 * 60 * 5)
+                }));
             var waterfallSteps = new WaterfallStep[]
             {
-                    IntroStepAsync,
-                    ActStepAsync,
-                    FinalStepAsync,
+                InitialStepAsync,
+                HandleAuthenticationResultAsync,
+                DisplayCoachesStep,
+                HandleCoachChoiceResultAsync
             };
+            var coachSteps = new WaterfallStep[] {
+                StartTalkToCoach,
+                RecieveTalkToCoach,
+                LoopBackStep
+            };
+            AddDialog(new WaterfallDialog(LoginPickCoach, waterfallSteps));
+            AddDialog(new WaterfallDialog(ChatWithCoach, coachSteps));
+            AddDialog(new TextPrompt(nameof(TextPrompt)));
+            AddDialog(new ChoicePrompt(nameof(ChoicePrompt)));
+            InitialDialogId = LoginPickCoach;
 
-            AddDialog(new WaterfallDialog(nameof(WaterfallDialog), waterfallSteps));
-
-            // The initial child Dialog to run.
-            InitialDialogId = nameof(WaterfallDialog);
         }
-
-        // Shows a warning if the requested From or To cities are recognized as entities but they are not in the Airport entity list.
-        // In some cases LUIS will recognize the From and To composite entities as a valid cities but the From and To Airport values
-        // will be empty if those entity values can't be mapped to a canonical item in the Airport.
-        private static async Task ShowWarningForUnsupportedCities(ITurnContext context, FlightBooking luisResult, CancellationToken cancellationToken)
+        protected const string LoginPickCoach = nameof(LoginPickCoach);
+        protected const string ChatWithCoach = nameof(ChatWithCoach);
+        private async Task<DialogTurnResult> LoopBackStep(WaterfallStepContext stepContext, CancellationToken cancellationToken)
         {
-            var unsupportedCities = new List<string>();
-
-            var fromEntities = luisResult.FromEntities;
-            if (!string.IsNullOrEmpty(fromEntities.From) && string.IsNullOrEmpty(fromEntities.Airport))
-            {
-                unsupportedCities.Add(fromEntities.From);
-            }
-
-            var toEntities = luisResult.ToEntities;
-            if (!string.IsNullOrEmpty(toEntities.To) && string.IsNullOrEmpty(toEntities.Airport))
-            {
-                unsupportedCities.Add(toEntities.To);
-            }
-
-            if (unsupportedCities.Any())
-            {
-                var messageText = $"Sorry but the following airports are not supported: {string.Join(',', unsupportedCities)}";
-                var message = MessageFactory.Text(messageText, messageText, InputHints.IgnoringInput);
-                await context.SendActivityAsync(message, cancellationToken);
-            }
+            // Optionally add a condition to break out of the loop
+            return await stepContext.ReplaceDialogAsync(ChatWithCoach, null, cancellationToken);
         }
-
-        private async Task<DialogTurnResult> IntroStepAsync(WaterfallStepContext stepContext, CancellationToken cancellationToken)
+        private async Task<DialogTurnResult> StartTalkToCoach(WaterfallStepContext stepContext, CancellationToken cancellationToken)
         {
-            if (!_luisRecognizer.IsConfigured)
-            {
-                await stepContext.Context.SendActivityAsync(
-                    MessageFactory.Text("NOTE: LUIS is not configured. To enable all capabilities, add 'LuisAppId', 'LuisAPIKey' and 'LuisAPIHostName' to the appsettings.json file.", inputHint: InputHints.IgnoringInput), cancellationToken);
-
-                return await stepContext.NextAsync(null, cancellationToken);
-            }
-
-            // Use the text provided in FinalStepAsync or the default if it is the first time.
-            var messageText = stepContext.Options?.ToString() ?? "What can I help you with today?\nSay something like \"Book a flight from Paris to Berlin on March 22, 2020\"";
-            var promptMessage = MessageFactory.Text(messageText, messageText, InputHints.ExpectingInput);
-            return await stepContext.PromptAsync(nameof(TextPrompt), new PromptOptions { Prompt = promptMessage }, cancellationToken);
+            return await stepContext.PromptAsync(nameof(TextPrompt), new PromptOptions {  }, cancellationToken); 
         }
-
-        private async Task<DialogTurnResult> ActStepAsync(WaterfallStepContext stepContext, CancellationToken cancellationToken)
+        private async Task<DialogTurnResult> RecieveTalkToCoach(WaterfallStepContext stepContext, CancellationToken cancellationToken)
         {
-            if (!_luisRecognizer.IsConfigured)
+            var msg = stepContext.Result as string;
+            if(msg == null)
             {
-                // LUIS is not configured, we just run the BookingDialog path with an empty BookingDetailsInstance.
-                return await stepContext.BeginDialogAsync(nameof(BookingDialog), new BookingDetails(), cancellationToken);
+                await stepContext.Context.SendActivityAsync(MessageFactory.Text("No message received."), cancellationToken);
             }
-
-            // Call LUIS and gather any potential booking details. (Note the TurnContext has the response to the prompt.)
-            var luisResult = await _luisRecognizer.RecognizeAsync<FlightBooking>(stepContext.Context, cancellationToken);
-            switch (luisResult.TopIntent().intent)
+            else
             {
-                case FlightBooking.Intent.BookFlight:
-                    await ShowWarningForUnsupportedCities(stepContext.Context, luisResult, cancellationToken);
+                await LLM.ChatWithCoach(msg, cancellationToken);
+            }
+            return await stepContext.NextAsync(null, cancellationToken);
 
-                    // Initialize BookingDetails with any entities we may have found in the response.
-                    var bookingDetails = new BookingDetails()
+        }
+        protected ILLM LLM { get; set; }
+        protected async override Task OnInitializeAsync(DialogContext dc)
+        {
+            ConvRef = dc.Context.Activity.GetConversationReference();
+            var id = ConvRef.Conversation.Id;
+            Logger.LogInformation(id);
+            var adapter = (AdapterWithErrorHandler)Adapter;
+            LLM = Factory.GetLLM(id, new ActionBlock<CloneResponse>(async response =>
+            {
+                Logger.LogInformation(response.text);
+                try
+                {
+                    await adapter.ContinueConversationAsync("7a754f6d-f4ef-43be-8cef-70971fbbc055", ConvRef, async (turnContext, token) =>
                     {
-                        // Get destination and origin from the composite entities arrays.
-                        Destination = luisResult.ToEntities.Airport,
-                        Origin = luisResult.FromEntities.Airport,
-                        TravelDate = luisResult.TravelDate,
-                    };
+                        await turnContext.SendActivityAsync(MessageFactory.Text(response.text), token);
+                    }, default);
+                    Logger.LogInformation("Message sent.");
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError(ex, ex.Message);
+                }
 
-                    // Run the BookingDialog giving it whatever details we have from the LUIS call, it will fill out the remainder.
-                    return await stepContext.BeginDialogAsync(nameof(BookingDialog), bookingDetails, cancellationToken);
+            }));
+            await base.OnInitializeAsync(dc);
+        }
+        private async Task<DialogTurnResult> InitialStepAsync(WaterfallStepContext stepContext, CancellationToken cancellationToken)
+        {
+            await stepContext.Context.SendActivityAsync(MessageFactory.Text("Welcome to Coursware Couch! Please wait while we try to log you in."), cancellationToken);
+            return await stepContext.PromptAsync(nameof(OAuthPrompt), new PromptOptions { }, cancellationToken);
+        }
+        private async Task<DialogTurnResult> DisplayCoachesStep(WaterfallStepContext stepContext, CancellationToken cancellationToken)
+        {
+            var coaches = await CoachRepository.Get(token: cancellationToken);
+            if(coaches.Items.Count == 0)
+            {
+                await stepContext.Context.SendActivityAsync(MessageFactory.Text("No coaches available."), cancellationToken);
+                return await stepContext.EndDialogAsync(null, cancellationToken);
+            }
+            var options = new PromptOptions
+            {
+                Prompt = MessageFactory.Text("Please select a coach."),
+                RetryPrompt = MessageFactory.Text("That was not a valid choice, please select a coach or type 'cancel'."),
+                Choices = ChoiceFactory.ToChoices(coaches.Items.Select(c => c.Name).ToList()),
+            };
+            return await stepContext.PromptAsync(nameof(ChoicePrompt), options, cancellationToken);
+        }
+        private async Task<DialogTurnResult> HandleCoachChoiceResultAsync(WaterfallStepContext stepContext, CancellationToken cancellationToken)
+        {
+            var choice = (FoundChoice)stepContext.Result;
 
-                case FlightBooking.Intent.GetWeather:
-                    // We haven't implemented the GetWeatherDialog so we just display a TODO message.
-                    var getWeatherMessageText = "TODO: get weather flow here";
-                    var getWeatherMessage = MessageFactory.Text(getWeatherMessageText, getWeatherMessageText, InputHints.IgnoringInput);
-                    await stepContext.Context.SendActivityAsync(getWeatherMessage, cancellationToken);
-                    break;
-
-                default:
-                    // Catch all for unhandled intents
-                    var didntUnderstandMessageText = $"Sorry, I didn't get that. Please try asking in a different way (intent was {luisResult.TopIntent().intent})";
-                    var didntUnderstandMessage = MessageFactory.Text(didntUnderstandMessageText, didntUnderstandMessageText, InputHints.IgnoringInput);
-                    await stepContext.Context.SendActivityAsync(didntUnderstandMessage, cancellationToken);
-                    break;
+            var coaches = await CoachRepository.Get(filter: c => c.Name == choice.Value, token: cancellationToken);
+            if(coaches.Items.Count == 0)
+            {
+                await stepContext.Context.SendActivityAsync(MessageFactory.Text("Coach not found."), cancellationToken);
+                return await stepContext.EndDialogAsync(null, cancellationToken);
+            }
+            if (!LLM.IsLoggedIn)
+            {
+                await stepContext.Context.SendActivityAsync(MessageFactory.Text("Not logged in."), cancellationToken);
+            }
+            await LLM.StartConversationWithCoach(coaches.Items.Single().Id, cancellationToken);
+            if (LLM.CurrentConversationId == null)
+            {
+                await stepContext.Context.SendActivityAsync(MessageFactory.Text("Failed to start conversation with coach."), cancellationToken);
+                return await stepContext.EndDialogAsync(null, cancellationToken);
+            }
+            // Continue the dialog or end it depending on your application's flow
+            return await stepContext.ReplaceDialogAsync(ChatWithCoach, null, cancellationToken);
+        }
+        private async Task<DialogTurnResult> HandleAuthenticationResultAsync(WaterfallStepContext stepContext, CancellationToken cancellationToken)
+        {
+            var result = stepContext.Result as TokenResponse;
+            if (result != null)
+            {
+                var userId = await GetUserId(result.Token);
+                if (userId != null)
+                {
+                    var user = await LLM.Login(userId, cancellationToken);
+                    if (user == null)
+                    {
+                        await stepContext.Context.SendActivityAsync(MessageFactory.Text("Login failed. Please try again."), cancellationToken);
+                        return await stepContext.EndDialogAsync(null, cancellationToken);
+                    }
+                    await stepContext.Context.SendActivityAsync(MessageFactory.Text($"Welcome {user.FirstName}!"), cancellationToken);
+                }
+                // User is authenticated
+                return await stepContext.NextAsync(result, cancellationToken);
             }
 
+            // Authentication failed
+            await stepContext.Context.SendActivityAsync(MessageFactory.Text("Authentication failed. Please try again."), cancellationToken);
             return await stepContext.NextAsync(null, cancellationToken);
         }
+        protected async Task<string?> GetAzureADB2CPublicKey()
+        {
+            using(var client = new HttpClient())
+            {
+                var mr = await client.GetStringAsync(MetadataUrl);
+                var md = JObject.Parse(mr);
+                var jwks_uri = md["jwks_uri"]?.ToString();
+                if(jwks_uri == null)
+                {
+                    return null;
+                }
+                return await client.GetStringAsync(jwks_uri);
+            }
+        }
+        protected async Task<string?> GetUserId(string jwtToken)
+        {
+            var handler = new JwtSecurityTokenHandler();
+            var jsonWebKeys = new JsonWebKeySet(await GetAzureADB2CPublicKey());
+            var validationParameters = new TokenValidationParameters
+            {
+                ValidateIssuerSigningKey = true,
+                IssuerSigningKeys = jsonWebKeys.GetSigningKeys(),
+                ValidateIssuer = true,
+                ValidIssuer = IssuerUrl ,
+                ValidateAudience = false,
+                ValidateLifetime = true
+            };
 
+            SecurityToken validatedToken;
+            var principal = handler.ValidateToken(jwtToken, validationParameters, out validatedToken);
+            var jwtTokenValidated = validatedToken as JwtSecurityToken;
+            if (jwtTokenValidated != null)
+            {
+                return jwtTokenValidated.Claims.SingleOrDefault(c => c.Type == "oid")?.Value;
+            }
+            return null;
+        }
         private async Task<DialogTurnResult> FinalStepAsync(WaterfallStepContext stepContext, CancellationToken cancellationToken)
         {
-            // If the child dialog ("BookingDialog") was cancelled, the user failed to confirm or if the intent wasn't BookFlight
-            // the Result here will be null.
-            if (stepContext.Result is BookingDetails result)
-            {
-                // Now we have all the booking details call the booking service.
-
-                // If the call to the booking service was successful tell the user.
-
-                var timeProperty = new TimexProperty(result.TravelDate);
-                var travelDateMsg = timeProperty.ToNaturalLanguage(DateTime.Now);
-                var messageText = $"I have you booked to {result.Destination} from {result.Origin} on {travelDateMsg}";
-                var message = MessageFactory.Text(messageText, messageText, InputHints.IgnoringInput);
-                await stepContext.Context.SendActivityAsync(message, cancellationToken);
-            }
-
-            // Restart the main dialog with a different message the second time around
-            var promptMessage = "What else can I do for you?";
-            return await stepContext.ReplaceDialogAsync(InitialDialogId, promptMessage, cancellationToken);
+            return await stepContext.EndDialogAsync(null, cancellationToken);
         }
+
     }
 }

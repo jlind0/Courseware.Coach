@@ -2,7 +2,7 @@
 @if (ViewModel != null)
 {
     <AlertView Alert="ViewModel.Alert" />
-    <h3>Prompts <button class="btn btn-primary" @onclick="ViewModel.Open.BindCommand<MouseEventArgs>()"><i class="fa-solid fa-plus"></i></button></h3>
+    <h3>Prompts <button class="btn btn-primary" @onclick="ViewModel.Open.BindCommand<MouseEventArgs>()"><i class="fa-solid fa-plus"></i> @ViewModel.Parent.Data.Name</button></h3>
     <TelerikDialog @bind-Visible="ViewModel.IsOpen" Title="Add Prompt">
         <DialogContent>
             <TelerikForm Model="ViewModel" OnValidSubmit="ViewModel.Add.BindCommand<EditContext>()">

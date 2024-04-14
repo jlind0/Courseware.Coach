@@ -5,8 +5,6 @@ VisualStudioVersion = 17.9.34723.18
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Courseware.Coach.Bot", "Courseware.Coach.Bot\Courseware.Coach.Bot\Courseware.Coach.Bot.csproj", "{65A6B4C0-0D7C-4677-A965-53EF8FFFFFCE}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Courseware.Coach.Bot.Tests", "Courseware.Coach.Bot\Courseware.Coach.Bot.Tests\Courseware.Coach.Bot.Tests.csproj", "{C318129F-B265-40BB-8154-489FCFF5800B}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Courseware.Coach.LLM.Core", "Courseware.Coach.LLM.Core\Courseware.Coach.LLM.Core.csproj", "{810E379B-7F87-432E-9B9F-37FF267B262B}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Courseware.Coach.LLM", "Courseware.Coach.LLM\Courseware.Coach.LLM.csproj", "{D1CFE5C1-90D3-447C-B2DA-98563AD911AE}"
@@ -43,10 +41,6 @@ Global
 		{65A6B4C0-0D7C-4677-A965-53EF8FFFFFCE}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{65A6B4C0-0D7C-4677-A965-53EF8FFFFFCE}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{65A6B4C0-0D7C-4677-A965-53EF8FFFFFCE}.Release|Any CPU.Build.0 = Release|Any CPU
-		{C318129F-B265-40BB-8154-489FCFF5800B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{C318129F-B265-40BB-8154-489FCFF5800B}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{C318129F-B265-40BB-8154-489FCFF5800B}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{C318129F-B265-40BB-8154-489FCFF5800B}.Release|Any CPU.Build.0 = Release|Any CPU
 		{810E379B-7F87-432E-9B9F-37FF267B262B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{810E379B-7F87-432E-9B9F-37FF267B262B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{810E379B-7F87-432E-9B9F-37FF267B262B}.Release|Any CPU.ActiveCfg = Release|Any CPU

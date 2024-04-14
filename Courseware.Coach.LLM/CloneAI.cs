@@ -1,6 +1,7 @@
 ﻿using Courseware.Coach.LLM.Core;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Microsoft.VisualBasic;
 using Newtonsoft.Json;
 using System;
@@ -17,9 +18,11 @@ namespace Courseware.Coach.LLM
     public class CloneAI : ICloneAI
     {
         protected string BaseUri { get; }
-        public CloneAI(IConfiguration config)
+        protected ILogger Logger { get; }
+        public CloneAI(IConfiguration config, ILogger<CloneAI> logger)
         {
             BaseUri = config["CloneAI:BaseUri"] ?? throw new InvalidDataException();
+            Logger = logger;
         }
         public async Task<CloneResponse?> GenerateResponse(string apiKey, ConversationRequestBody body, CancellationToken token = default)
         {
@@ -28,6 +31,7 @@ namespace Courseware.Coach.LLM
             using (var client = new HttpClient())
             using (var request = new HttpRequestMessage())
             {
+                client.Timeout = TimeSpan.FromSeconds(30);
                 // Build the request.
                 request.Method = HttpMethod.Post;
                 request.RequestUri = new Uri(BaseUri + route);
@@ -38,7 +42,9 @@ namespace Courseware.Coach.LLM
                 HttpResponseMessage response = await client.SendAsync(request, token);
                 // Read response as a string.
                 response.EnsureSuccessStatusCode();
-                return await response.Content.ReadFromJsonAsync<CloneResponse>(token);
+                var resp = await response.Content.ReadAsStringAsync();
+                Logger.LogInformation(resp);
+                return JsonConvert.DeserializeObject<CloneResponseWrapper>(resp)?.clone_response;
             }
         }
 
@@ -52,7 +58,7 @@ namespace Courseware.Coach.LLM
                 request.Method = HttpMethod.Get;
                 request.RequestUri = new Uri(BaseUri + route);
                 request.Headers.Add("x-api-key", apiKey);
-
+                
                 // Send the request and get response.
                 HttpResponseMessage response = await client.SendAsync(request, token);
                 // Read response as a string.
@@ -90,6 +96,7 @@ namespace Courseware.Coach.LLM
                 user_email = email
             };
             var requestBody = JsonConvert.SerializeObject(body);
+            Logger.LogInformation(requestBody);
             using (var client = new HttpClient())
             using (var request = new HttpRequestMessage())
             {
@@ -103,13 +110,15 @@ namespace Courseware.Coach.LLM
                 HttpResponseMessage response = await client.SendAsync(request, token);
                 // Read response as a string.
                 response.EnsureSuccessStatusCode();
-                return await response.Content.ReadFromJsonAsync<NewConversationResponse>(token);
+                var resp = await response.Content.ReadAsStringAsync();
+                Logger.LogInformation(resp);
+                return JsonConvert.DeserializeObject<NewConversationResponse>(resp);
             }
         }
 
         public async Task UploadUserInfo(string apiKey, string email, string slug, string? info = null, CancellationToken token = default)
         {
-            string route = "clone/user_info";
+            string route = "/clone/user_info";
             if (info != null)
             {
                 Regex wordPattern = new Regex(@"\b\w+\b");

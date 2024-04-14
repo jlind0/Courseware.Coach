@@ -9,7 +9,7 @@ namespace Courseware.Coach.LLM.Core
 {
     public class NewConversationBody
     {
-        public Guid conversation_id { get; set; }
+        public string conversation_id { get; set; } = null!;
         public DateTime created_at { get; set; }
         
         public MessageBody[] messages { get; set; } = [];
@@ -23,7 +23,7 @@ namespace Courseware.Coach.LLM.Core
     public class NewConversationResponse
     {
        
-        public NewConversationBody new_conversation { get; set; } = null!;
+        public NewConversationBody @new { get; set; } = null!;
         public string conversation_type { get; set; } = null!;
     }
     public class ConversationHistory
@@ -33,11 +33,13 @@ namespace Courseware.Coach.LLM.Core
     public class ConversationRequestBody
     {
         [Required]
-        public Guid conversation_id { get; set; }
-        public string image_url { get; set; } = "None";
+        public string conversation_id { get; set; }
         [Required]
         public string user_message { get; set; } = null!;
-        public bool stream { get; set; } = false;
+    }
+    public class CloneResponseWrapper
+    {
+        public CloneResponse clone_response { get; set; } = null!;
     }
     public class CloneResponse
     {

@@ -4,6 +4,7 @@ using Courseware.Coach.Data.Core;
 using Courseware.Coach.LLM.Core;
 using Courseware.Coach.Subscriptions.Core;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using ReactiveUI;
 using System;
 using System.Collections.Concurrent;
@@ -71,8 +72,8 @@ namespace Courseware.Coach.LLM
             get => currentSubscription;
             protected set => this.RaiseAndSetIfChanged(ref currentSubscription, value);
         }
-        private Guid? currentConversationId;
-        public Guid? CurrentConversationId
+        private string? currentConversationId;
+        public string? CurrentConversationId
         {
             get => currentConversationId;
             protected set => this.RaiseAndSetIfChanged(ref currentConversationId, value);
@@ -81,11 +82,11 @@ namespace Courseware.Coach.LLM
 
         protected BroadcastBlock<CloneResponse> BrodcastConversation { get; }
 
-        public ITargetBlock<CloneResponse> Conversation { get => BrodcastConversation; }
+        public ISourceBlock<CloneResponse> Conversation { get => BrodcastConversation; }
 
         protected BroadcastBlock<byte[]> BrodcastAudioConversation { get; }
 
-        public ITargetBlock<byte[]> AudioConversation{ get => BrodcastAudioConversation; }
+        public ISourceBlock<byte[]> AudioConversation{ get => BrodcastAudioConversation; }
 
         protected ICloneAI CloneAI { get; }
         protected ITTS TTS { get; }
@@ -94,6 +95,7 @@ namespace Courseware.Coach.LLM
         protected IRepository<UnitOfWork, CH> CoachRepo { get; }
         protected IRepository<UnitOfWork, Course> CourseRepo { get; }
         protected ISubscriptionManager SubscriptionManager { get; }
+        protected ILogger Logger { get; }
         private string? currentLocale;
         public string? CurrentLocale
         {
@@ -103,9 +105,10 @@ namespace Courseware.Coach.LLM
         protected bool IsVoiceEnabled { get; }
         public LLM(ICloneAI cloneAI, ITTS tts, ITranslationService translation, ISubscriptionManager subscriptionManager,
             IRepository<UnitOfWork, User> userRepo, IRepository<UnitOfWork, CH> coachRepo, 
-            IRepository<UnitOfWork, Course> courseRepo, IConfiguration config)
+            IRepository<UnitOfWork, Course> courseRepo, IConfiguration config, ILogger<LLM> logger)
         {
             IsVoiceEnabled = bool.Parse(config["LLM:VoiceEnabled"] ?? "false");
+            Logger = logger;
             SubscriptionManager = subscriptionManager;
             CloneAI = cloneAI;
             TTS = tts;
@@ -125,11 +128,10 @@ namespace Courseware.Coach.LLM
                 await StartConversationWithCoach(CurrentCoach.Id, token);
             if (CurrentConversationId == null)
                 throw new InvalidOperationException("No conversation started");
-            if(CurrentSubscription == null && CurrentCoach.Price > 0)
-                throw new InvalidOperationException("No subscription");
+            Logger.LogInformation($"Current Conversation Id : {CurrentConversationId}");
             var resp = await CloneAI.GenerateResponse(CurrentCoach.APIKey, new ConversationRequestBody()
             {
-                conversation_id = CurrentConversationId.Value,
+                conversation_id = CurrentConversationId,
                 user_message = message
 
             }, token);
@@ -182,7 +184,7 @@ namespace Courseware.Coach.LLM
             
             var resp = await CloneAI.GenerateResponse(CurrentCoach.APIKey, new ConversationRequestBody() 
                 { 
-                    conversation_id = CurrentConversationId.Value, 
+                    conversation_id = CurrentConversationId, 
                     user_message = message 
                 }
                 , token);
@@ -204,7 +206,7 @@ namespace Courseware.Coach.LLM
             return Task.CompletedTask;
         }
 
-        public ITargetBlock<Lesson> FollowLessons(ISourceBlock<bool> moveBlock, CancellationToken token = default)
+        public ISourceBlock<Lesson> FollowLessons(ISourceBlock<bool> moveBlock, CancellationToken token = default)
         {
             if (CurrentCourse?.Lessons == null)
                 throw new InvalidOperationException("No course or lessons available.");
@@ -238,7 +240,7 @@ namespace Courseware.Coach.LLM
 
         }
 
-        public ITargetBlock<Prompt> FollowPrompts(ISourceBlock<Lesson> moveBlock, CancellationToken token = default)
+        public ISourceBlock<Prompt> FollowPrompts(ISourceBlock<Lesson> moveBlock, CancellationToken token = default)
         {
             var bufferBlock = new BufferBlock<Prompt>(new DataflowBlockOptions { CancellationToken = token });
             moveBlock.LinkTo(new ActionBlock<Lesson>(async lesson =>
@@ -263,7 +265,7 @@ namespace Courseware.Coach.LLM
                 {
                     CurrentUser = users.Items.Single();
                     if(CurrentCoach != null)
-                        await CloneAI.UploadUserInfo(CurrentCoach.APIKey, CurrentUser.Email, CurrentCoach.Slug, token: token);
+                        await CloneAI.UploadUserInfo(CurrentCoach.APIKey, CurrentUser.Email, CurrentCoach.Slug, CurrentUser.Bio, token: token);
                 }
             }
             return CurrentUser;
@@ -278,7 +280,7 @@ namespace Courseware.Coach.LLM
         {
             await UserRepo.Add(user, token: token);
             if(CurrentCoach != null)
-                await CloneAI.UploadUserInfo(CurrentCoach.APIKey, user.Email, CurrentCoach.Slug, token: token);
+                await CloneAI.UploadUserInfo(CurrentCoach.APIKey, user.Email, CurrentCoach.Slug, user.Bio, token: token);
             return user;
         }
 
@@ -322,14 +324,21 @@ namespace Courseware.Coach.LLM
                 CurrentCoach = await CoachRepo.Get(coachId, token: token);
                 if (CurrentCoach == null)
                     return null;
-                if (CurrentUser != null)
-                    CurrentSubscription = await SubscriptionManager.GetCurrentSubscriptionForCoach(coachId, CurrentUser.ObjectId, token);
-                if (CurrentCoach.Price > 0 && CurrentSubscription == null)
-                    throw new InvalidOperationException("No subscription");
+                if (CurrentUser == null)
+                    return null;
+                CurrentSubscription = await SubscriptionManager.GetCurrentSubscriptionForCoach(coachId, CurrentUser.ObjectId, token);
+                /*if (!await SubscriptionManager.IsSubscribedToCoach(coachId, CurrentUser.ObjectId, token))
+                    return null;
+                await CloneAI.UploadUserInfo(CurrentCoach.APIKey, CurrentUser.Email, CurrentCoach.Slug, CurrentUser.Bio, token: token);*/
                 var resp = await CloneAI.StartConversation(CurrentCoach.APIKey, CurrentCoach.Slug, email: CurrentUser?.Email, token: token);
+                Logger.LogInformation("Conversation started");
                 if (resp != null)
                 {
-                    CurrentConversationId = resp.new_conversation.conversation_id;
+                    CurrentConversationId = resp.@new.conversation_id;
+                    foreach(var msg in resp.@new.messages)
+                    {
+                        await PushText(new CloneResponse() { text = msg.text}, CurrentCoach.NativeLocale, CurrentCoach.DefaultVoiceName, token);
+                    }
                 }
                 return CurrentCoach;
             }
@@ -350,7 +359,7 @@ namespace Courseware.Coach.LLM
             var resp = await CloneAI.StartConversation(CurrentCoach.APIKey, CurrentCoach.Slug, ci.Slug, email: CurrentUser?.Email, token: token);
             if (resp != null)
             {
-                CurrentConversationId = resp.new_conversation.conversation_id;
+                CurrentConversationId = resp.@new.conversation_id;
             }
             return CurrentCoachInstance;
         }
