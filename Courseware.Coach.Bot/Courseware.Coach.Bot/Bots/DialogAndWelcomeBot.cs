@@ -1,5 +1,6 @@
 ﻿// Generated with Bot Builder V4 SDK Template for Visual Studio CoreBot v4.22.0
 
+using Courseware.Coach.Bot.Dialogs;
 using Microsoft.Bot.Builder;
 using Microsoft.Bot.Builder.Dialogs;
 using Microsoft.Bot.Schema;
@@ -16,9 +17,11 @@ namespace Courseware.Coach.Bot.Bots
     public class DialogAndWelcomeBot<T> : DialogBot<T>
         where T : Dialog
     {
-        public DialogAndWelcomeBot(ConversationState conversationState, UserState userState, T dialog, ILogger<DialogBot<T>> logger)
+        protected LLMFactory Factory { get; set; }
+        public DialogAndWelcomeBot(ConversationState conversationState, UserState userState, T dialog, ILogger<DialogBot<T>> logger, LLMFactory factory)
             : base(conversationState, userState, dialog, logger)
         {
+            Factory = factory;
         }
 
         protected override async Task OnMembersAddedAsync(IList<ChannelAccount> membersAdded, ITurnContext<IConversationUpdateActivity> turnContext, CancellationToken cancellationToken)
@@ -33,7 +36,12 @@ namespace Courseware.Coach.Bot.Bots
                 }
             }
         }
-
+        protected override async Task OnMembersRemovedAsync(IList<ChannelAccount> membersRemoved, ITurnContext<IConversationUpdateActivity> turnContext, CancellationToken cancellationToken)
+        {
+            await Factory.DisconnectLLM(turnContext.Activity.Conversation.Id);
+            Logger.LogInformation($"LLM Disconnected: {turnContext.Activity.Conversation.Id}");
+            await base.OnMembersRemovedAsync(membersRemoved, turnContext, cancellationToken);
+        }
         // Load attachment from embedded resource.
         private Attachment CreateAdaptiveCardAttachment()
         {

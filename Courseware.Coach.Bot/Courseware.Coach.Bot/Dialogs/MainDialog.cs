@@ -11,6 +11,7 @@ using Microsoft.Bot.Builder;
 using Microsoft.Bot.Builder.Dialogs;
 using Microsoft.Bot.Builder.Dialogs.Choices;
 using Microsoft.Bot.Builder.Integration.AspNet.Core;
+using Microsoft.Bot.Connector.Authentication;
 using Microsoft.Bot.Schema;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -39,22 +40,30 @@ namespace Courseware.Coach.Bot.Dialogs
         {
             Provider = provider;
         }
-        public ILLM GetLLM(string id, ActionBlock<CloneResponse> response)
+        public ILLM GetLLM(string id, ActionBlock<CloneResponse>? response = null)
         {
             if(LLMs.ContainsKey(id))
             {
                 return LLMs[id];
             }
             LLMs[id] = Provider.GetRequiredService<ILLM>();
-            LLMs[id].Conversation.LinkTo(response); 
+            if(response != null)
+                LLMs[id].Conversation.LinkTo(response); 
             return LLMs[id];
+        }
+        public async Task DisconnectLLM(string id)
+        {
+            if (LLMs.ContainsKey(id))
+            {
+                await LLMs[id].DisposeAsync();
+                LLMs.Remove(id);
+            }
         }
     }
     public class MainDialog : ComponentDialog
     {
         protected ILogger Logger { get; }
         protected string ConnectionName { get; }
-        protected ConversationReference? ConvRef { get; private set; }
         protected IRepository<UnitOfWork, CH> CoachRepository { get; }
         protected string MetadataUrl { get; }
         protected string IssuerUrl { get; }
@@ -114,6 +123,7 @@ namespace Courseware.Coach.Bot.Dialogs
         }
         private async Task<DialogTurnResult> RecieveTalkToCoach(WaterfallStepContext stepContext, CancellationToken cancellationToken)
         {
+            var LLM = Factory.GetLLM(stepContext.Context.Activity.Conversation.Id);
             var msg = stepContext.Result as string;
             if(msg == null)
             {
@@ -126,14 +136,55 @@ namespace Courseware.Coach.Bot.Dialogs
             return await stepContext.NextAsync(null, cancellationToken);
 
         }
-        protected ILLM LLM { get; set; }
+        protected override async Task<DialogTurnResult> OnBeginDialogAsync(DialogContext innerDc, object options, CancellationToken cancellationToken = default(CancellationToken))
+        {
+            var result = await InterruptAsync(innerDc, cancellationToken);
+            if (result != null)
+            {
+                return result;
+            }
+
+            return await base.OnBeginDialogAsync(innerDc, options, cancellationToken);
+        }
+
+        protected override async Task<DialogTurnResult> OnContinueDialogAsync(DialogContext innerDc, CancellationToken cancellationToken = default(CancellationToken))
+        {
+            var result = await InterruptAsync(innerDc, cancellationToken);
+            if (result != null)
+            {
+                return result;
+            }
+
+            return await base.OnContinueDialogAsync(innerDc, cancellationToken);
+        }
+
+        private async Task<DialogTurnResult> InterruptAsync(DialogContext innerDc, CancellationToken cancellationToken = default(CancellationToken))
+        {
+            if (innerDc.Context.Activity.Type == ActivityTypes.Message)
+            {
+                var text = innerDc.Context.Activity.Text.ToLowerInvariant();
+
+                if (text == "/logout")
+                {
+                    // The UserTokenClient encapsulates the authentication processes.
+                    var userTokenClient = innerDc.Context.TurnState.Get<UserTokenClient>();
+                    await userTokenClient.SignOutUserAsync(innerDc.Context.Activity.From.Id, ConnectionName, innerDc.Context.Activity.ChannelId, cancellationToken).ConfigureAwait(false);
+
+                    await innerDc.Context.SendActivityAsync(MessageFactory.Text("You have been signed out."), cancellationToken);
+                    return await innerDc.CancelAllDialogsAsync(cancellationToken);
+                }
+            }
+
+            return null;
+        }
         protected async override Task OnInitializeAsync(DialogContext dc)
         {
-            ConvRef = dc.Context.Activity.GetConversationReference();
-            var id = ConvRef.Conversation.Id;
+            var ConvRef = dc.Context.Activity.GetConversationReference();
+            var id = dc.Context.Activity.Conversation.Id;
             Logger.LogInformation(id);
             var adapter = (AdapterWithErrorHandler)Adapter;
-            LLM = Factory.GetLLM(id, new ActionBlock<CloneResponse>(async response =>
+            
+            Factory.GetLLM(id, new ActionBlock<CloneResponse>(async response =>
             {
                 Logger.LogInformation(response.text);
                 try
@@ -183,6 +234,7 @@ namespace Courseware.Coach.Bot.Dialogs
                 await stepContext.Context.SendActivityAsync(MessageFactory.Text("Coach not found."), cancellationToken);
                 return await stepContext.EndDialogAsync(null, cancellationToken);
             }
+            var LLM = Factory.GetLLM(stepContext.Context.Activity.Conversation.Id);
             if (!LLM.IsLoggedIn)
             {
                 await stepContext.Context.SendActivityAsync(MessageFactory.Text("Not logged in."), cancellationToken);
@@ -198,6 +250,7 @@ namespace Courseware.Coach.Bot.Dialogs
         }
         private async Task<DialogTurnResult> HandleAuthenticationResultAsync(WaterfallStepContext stepContext, CancellationToken cancellationToken)
         {
+            var LLM = Factory.GetLLM(stepContext.Context.Activity.Conversation.Id);
             var result = stepContext.Result as TokenResponse;
             if (result != null)
             {

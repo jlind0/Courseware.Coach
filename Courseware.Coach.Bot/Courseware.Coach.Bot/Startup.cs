@@ -65,13 +65,13 @@ namespace Courseware.Coach.Bot
             services.AddSingleton<ICloneAI, CloneAI>();
             services.AddSingleton<ITTS, TTS>();
             services.AddSingleton<ITranslationService, TranslationService>();
-            services.AddScoped<ILLM, LLM.LLM>();
+            services.AddTransient<ILLM, LLM.LLM>();
             services.AddSingleton<LLMFactory>();
             // Create the User state. (Used in this bot's Dialog implementation.)
-            services.AddSingleton<UserState>();
+            services.AddScoped<UserState>();
 
             // Create the Conversation state. (Used by the Dialog system itself.)
-            services.AddSingleton<ConversationState>();
+            services.AddScoped<ConversationState>();
 
 
             // The MainDialog that will be run by the bot.
