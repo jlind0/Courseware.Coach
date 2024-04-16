@@ -454,6 +454,12 @@ namespace Courseware.Coach.Bot.Dialogs
                 {
                     return await innerDc.ReplaceDialogAsync(MainMenu, null, cancellationToken);
                 }
+                else if (text.StartsWith("/lang"))
+                {
+                    text = text.Replace("/lang", "").Trim();
+                    var LLM = Factory.GetLLM(innerDc.Context.Activity.Conversation.Id);
+                    await LLM.SetLocale(text, cancellationToken);
+                }
             }
 
             return null;

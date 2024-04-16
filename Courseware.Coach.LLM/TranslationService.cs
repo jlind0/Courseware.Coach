@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Net.Http.Json;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -45,8 +46,18 @@ namespace Courseware.Coach.LLM
                 // Send the request and get response.
                 HttpResponseMessage response = await client.SendAsync(request);
                 // Read response as a string.
-                return await response.Content.ReadAsStringAsync();
+                var result = await response.Content.ReadFromJsonAsync<TranslationResult[]>();
+                return result?.FirstOrDefault()?.translations?.FirstOrDefault()?.text ?? text;
             }
+        }
+        
+        class TranslationResult
+        {
+            public Translation[] translations { get; set; } = null!;
+        }
+        class Translation
+        {
+            public string text { get; set; } = null!;
         }
     }
 }
