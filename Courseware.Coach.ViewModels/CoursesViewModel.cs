@@ -7,6 +7,7 @@ using Microsoft.CognitiveServices.Speech.Translation;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
 using System.Collections.ObjectModel;
+using System.ComponentModel.DataAnnotations;
 using System.Reactive;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
@@ -457,6 +458,7 @@ namespace Courseware.Coach.ViewModels
                 this.RaisePropertyChanged(nameof(SelectedCoach));
             }
         }
+        [Required]
         public CH? SelectedCoach
         {
             get => Coaches.SingleOrDefault(d => d.Id == Data.CoachId);

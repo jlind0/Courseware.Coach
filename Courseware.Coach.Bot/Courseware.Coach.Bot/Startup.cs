@@ -68,10 +68,10 @@ namespace Courseware.Coach.Bot
             services.AddTransient<ILLM, LLM.LLM>();
             services.AddSingleton<LLMFactory>();
             // Create the User state. (Used in this bot's Dialog implementation.)
-            services.AddScoped<UserState>();
+            services.AddSingleton<UserState>();
 
             // Create the Conversation state. (Used by the Dialog system itself.)
-            services.AddScoped<ConversationState>();
+            services.AddSingleton<ConversationState>();
 
 
             // The MainDialog that will be run by the bot.

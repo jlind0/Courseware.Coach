@@ -42,20 +42,19 @@ namespace Courseware.Coach.Bot.Dialogs
         }
         public ILLM GetLLM(string id, ActionBlock<CloneResponse>? response = null)
         {
-            if(LLMs.ContainsKey(id))
-            {
-                return LLMs[id];
-            }
-            LLMs[id] = Provider.GetRequiredService<ILLM>();
-            if(response != null)
-                LLMs[id].Conversation.LinkTo(response); 
-            return LLMs[id];
+            if(LLMs.TryGetValue(id, out ILLM value))
+                return value;
+            var llm = Provider.GetRequiredService<ILLM>();
+            LLMs[id] = llm;
+            if (response != null)
+                llm.Conversation.LinkTo(response); 
+            return llm;
         }
         public async Task DisconnectLLM(string id)
         {
-            if (LLMs.ContainsKey(id))
+            if (LLMs.TryGetValue(id, out ILLM value))
             {
-                await LLMs[id].DisposeAsync();
+                await value.DisposeAsync();
                 LLMs.Remove(id);
             }
         }
@@ -125,8 +124,17 @@ namespace Courseware.Coach.Bot.Dialogs
             var followPromptsSteps = new WaterfallStep[]
             {
                 StartLessonPrompt,
-                RecieveLessonPrompt,
-                LoopBackLessonPrompt
+                RecieveLessonPrompt
+            };
+            var continueWithLesson = new WaterfallStep[]
+            {
+                ContinueLessonPrompt,
+                RecieveLessonPrompt
+            };
+            var finishLesson = new WaterfallStep[]
+            {
+                StartFinishLesson,
+                RecieveFinishLesson
             };
             AddDialog(new WaterfallDialog(LoginPickCoach, waterfallSteps));
             AddDialog(new WaterfallDialog(ChatWithCoach, coachSteps));
@@ -135,8 +143,11 @@ namespace Courseware.Coach.Bot.Dialogs
             AddDialog(new WaterfallDialog(PickCourse, pickCourseSteps));
             AddDialog(new WaterfallDialog(TakeLesson, takeLessonSteps));
             AddDialog(new WaterfallDialog(FollowPrompts, followPromptsSteps));
+            AddDialog(new WaterfallDialog(ContinueLesson, continueWithLesson));
+            AddDialog(new WaterfallDialog(FinishLesson, finishLesson));
             AddDialog(new TextPrompt(nameof(TextPrompt)));
             AddDialog(new ChoicePrompt(nameof(ChoicePrompt)));
+            AddDialog(new ConfirmPrompt(nameof(ConfirmPrompt)));
             InitialDialogId = LoginPickCoach;
 
         }
@@ -147,6 +158,21 @@ namespace Courseware.Coach.Bot.Dialogs
         protected const string PickCourse = nameof(PickCourse);
         protected const string TakeLesson = nameof(TakeLesson);
         protected const string FollowPrompts = nameof(FollowPrompts);
+        protected const string ContinueLesson = nameof(ContinueLesson);
+        protected const string FinishLesson = nameof(FinishLesson);
+        private async Task<DialogTurnResult> StartFinishLesson(WaterfallStepContext stepContext, CancellationToken cancellationToken)
+        {
+            return await stepContext.PromptAsync(nameof(ConfirmPrompt), new PromptOptions { Prompt = MessageFactory.Text("You have finished the lesson, would you like to start the next one?") });
+        }
+        private async Task<DialogTurnResult> RecieveFinishLesson(WaterfallStepContext stepContext, CancellationToken cancellationToken)
+        {
+            var result = (bool)stepContext.Result;
+            if (result)
+            {
+                return await stepContext.ReplaceDialogAsync(TakeLesson, null, cancellationToken);
+            }
+            return await stepContext.ReplaceDialogAsync(MainMenu, null, cancellationToken);
+        }
         private async Task<DialogTurnResult> LoopBackChatWithCoachStep(WaterfallStepContext stepContext, CancellationToken cancellationToken)
         {
             // Optionally add a condition to break out of the loop
@@ -189,7 +215,7 @@ namespace Courseware.Coach.Bot.Dialogs
             var prompt = LLM.GetNextPrompt();
             if (prompt == null)
             {
-                return await stepContext.BeginDialogAsync(nameof(TakeLesson), null, token);
+                return await stepContext.ReplaceDialogAsync(nameof(FinishLesson), null, token);
             }
             await stepContext.Context.SendActivityAsync(MessageFactory.Text(prompt.Text), token);
             return await stepContext.PromptAsync(nameof(TextPrompt), new PromptOptions { }, token);
@@ -202,11 +228,19 @@ namespace Courseware.Coach.Bot.Dialogs
             {
                 await stepContext.Context.SendActivityAsync(MessageFactory.Text("No message received."), token);
             }
+            else if(msg.ToLowerInvariant() == "/next")
+            {
+                return await stepContext.ReplaceDialogAsync(FollowPrompts, null, token);
+            }
             else
             {
                 await LLM.SendMessageForCurrentPrompt(msg, token);
             }
-            return await stepContext.NextAsync(null, token);
+            return await stepContext.ReplaceDialogAsync(ContinueLesson, null, token);
+        }
+        protected async Task<DialogTurnResult> ContinueLessonPrompt(WaterfallStepContext stepContext, CancellationToken token)
+        {
+            return await stepContext.PromptAsync(nameof(TextPrompt), new PromptOptions { }, token);
         }
         protected async Task<DialogTurnResult> LoopBackLessonPrompt(WaterfallStepContext stepContext, CancellationToken token)
         {
