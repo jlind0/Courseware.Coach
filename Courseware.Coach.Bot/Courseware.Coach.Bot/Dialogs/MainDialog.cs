@@ -372,8 +372,28 @@ namespace Courseware.Coach.Bot.Dialogs
             {
                 return await stepContext.ReplaceDialogAsync(nameof(FinishLesson), null, token);
             }
-            await stepContext.Context.SendActivityAsync(MessageFactory.Text(prompt.Text), token);
-            return await stepContext.PromptAsync(nameof(TextPrompt), new PromptOptions { }, token);
+            if (prompt.Type == PromptTypes.Lecture)
+            {
+                CancellationTokenSource cts = new CancellationTokenSource();
+                // Start a task that sends typing activity every few seconds
+                var typingTask = RepeatTypingIndicatorAsync(stepContext.Context, cts.Token);
+                try
+                {
+                    await LLM.SendMessageForCurrentPrompt("", token);
+                }
+                finally
+                {
+                    // Once the operation is complete, cancel the typing task
+                    cts.Cancel();
+                    await typingTask; // Ensure to await the typing task to handle any loose ends
+                }
+                return await stepContext.ReplaceDialogAsync(ContinueLesson, null, token);
+            }
+            else
+            {
+                await stepContext.Context.SendActivityAsync(MessageFactory.Text(prompt.Text), token);
+                return await stepContext.PromptAsync(nameof(TextPrompt), new PromptOptions { }, token);
+            }
         }
         protected async Task<DialogTurnResult> RecieveLessonPrompt(WaterfallStepContext stepContext, CancellationToken token)
         {

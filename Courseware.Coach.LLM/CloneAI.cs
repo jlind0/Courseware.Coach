@@ -31,7 +31,7 @@ namespace Courseware.Coach.LLM
             using (var client = new HttpClient())
             using (var request = new HttpRequestMessage())
             {
-                client.Timeout = TimeSpan.FromSeconds(30);
+                client.Timeout = TimeSpan.FromSeconds(120);
                 // Build the request.
                 request.Method = HttpMethod.Post;
                 request.RequestUri = new Uri(BaseUri + route);

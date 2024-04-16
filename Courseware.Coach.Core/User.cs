@@ -154,6 +154,14 @@ namespace Courseware.Coach.Core
         public int Order { get; set; }
         public List<Prompt> Prompts { get; set; } = [];
         public Quiz? Quiz { get; set; }
+        public List<Quote> Quotes { get; set; } = [];
+    }
+    public class Quote
+    {
+        [Required]
+        public string Author { get; set; } = null!;
+        [Required]
+        public string Text { get; set; } = null!;
     }
     public class Quiz
     {
@@ -185,6 +193,13 @@ namespace Courseware.Coach.Core
         public string Text { get; set; } = null!;
         [Required]
         public int Order { get; set; }
+
+        public PromptTypes? Type { get; set; } = PromptTypes.Question;
+    }
+    public enum PromptTypes
+    {
+        Question,
+        Lecture
     }
     public class RecurringPayment
     {
