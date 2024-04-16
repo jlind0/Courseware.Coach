@@ -48,6 +48,7 @@ namespace Courseware.Coach.Business
             var coach = await base.Add(entity, work, token);
             if (coach != null && coach.Price != null)
                 await SubscriptionManager.SetPriceForCoach(coach.Id, coach.Price.Value, token);
+            
             return coach ?? throw new InvalidDataException();
         }
         public override async Task<CH> Update(CH entity, UnitOfWork? work = null, CancellationToken token = default)

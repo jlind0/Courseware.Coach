@@ -53,6 +53,9 @@ namespace Courseware.Coach.Bot
             services.AddTransient<ProductService>();
             services.AddTransient<PaymentLinkService>();
             services.AddTransient<SessionService>();
+            services.AddTransient<AccountService>();
+            services.AddTransient<ExternalAccountService>();
+            services.AddTransient<PayoutService>();
             services.AddSingleton<BlobServiceClient>(x =>
                 new BlobServiceClient(Configuration.GetConnectionString("ImageBlob"))
             );

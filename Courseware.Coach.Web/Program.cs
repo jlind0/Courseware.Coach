@@ -57,6 +57,9 @@ builder.Services.AddTransient<PriceService>();
 builder.Services.AddTransient<ProductService>();
 builder.Services.AddTransient<PaymentLinkService>();
 builder.Services.AddTransient<SessionService>();
+builder.Services.AddTransient<AccountService>();
+builder.Services.AddTransient<ExternalAccountService>();
+builder.Services.AddTransient<PayoutService>();
 builder.Services.AddSingleton<BlobServiceClient>(x =>
     new BlobServiceClient(builder.Configuration.GetConnectionString("ImageBlob"))
 );

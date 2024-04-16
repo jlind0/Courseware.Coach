@@ -24,10 +24,13 @@ namespace Courseware.Coach.Subscriptions
         protected PriceService PriceService { get; }
         protected PaymentLinkService PaymentLinkService { get; }
         protected SessionService SessionService { get; }
+        protected AccountService AccountService { get; }
+        protected ExternalAccountService ExtAccountService { get; }
+        protected PayoutService PayoutService { get; }
         protected string PaymentSuccessUri { get; }
         public SubscriptionManager(IRepository<UnitOfWork, User> userRepo, IConfiguration config,
             IRepository<UnitOfWork, CH> coachRepo, IRepository<UnitOfWork, Course> courseRepo, 
-            ProductService productService, PriceService priceService, PaymentLinkService paymentLinkService, SessionService sessionService)
+            ProductService productService, PriceService priceService, PaymentLinkService paymentLinkService, SessionService sessionService, AccountService accountService, PayoutService payoutService, ExternalAccountService extAccountService)
         {
             UserRepo = userRepo;
             CoachRepo = coachRepo;
@@ -36,6 +39,9 @@ namespace Courseware.Coach.Subscriptions
             PriceService = priceService;
             PaymentLinkService = paymentLinkService;
             SessionService = sessionService;
+            AccountService = accountService;
+            PayoutService = payoutService;
+            ExtAccountService = extAccountService;
             PaymentSuccessUri = config["Stripe:SuccessUrl"] ?? throw new InvalidDataException();
 
         }
@@ -61,7 +67,7 @@ namespace Courseware.Coach.Subscriptions
             }
             return (await GetCurrentSubscriptionForCourse(courseId, objectId, token)) != null;
         }
-        protected async Task CreateProduct(IPriced entity, CancellationToken token = default)
+        protected async Task CreateProduct(IPriced entity, bool isSubscription = false, CancellationToken token = default)
         {
             var prod = new ProductCreateOptions()
             {
@@ -71,10 +77,10 @@ namespace Courseware.Coach.Subscriptions
             if (product != null)
             {
                 entity.StripeProductId = product.Id;
-                await CreatePrice(entity, token);
+                await CreatePrice(entity, isSubscription, token);
             }
         }
-        protected async Task CreatePrice(IPriced entity, CancellationToken token = default)
+        protected async Task CreatePrice(IPriced entity, bool isSubscription = false, CancellationToken token = default)
         {
             if (!string.IsNullOrWhiteSpace(entity.StripeProductId) && entity.Price != null)
             {
@@ -84,6 +90,13 @@ namespace Courseware.Coach.Subscriptions
                     Currency = "usd",
                     Product = entity.StripeProductId
                 };
+                if (isSubscription)
+                {
+                    price.Recurring = new PriceRecurringOptions()
+                    {
+                        Interval = "month"
+                    };
+                }
                 var p = await PriceService.CreateAsync(price, cancellationToken: token);
                 if (p != null)
                 {
@@ -114,12 +127,12 @@ namespace Courseware.Coach.Subscriptions
                 }
                 if(coach.StripeProductId == null)
                 {
-                    await CreateProduct(coach, token);
+                    await CreateProduct(coach, true, token);
                 }
                 if(coach.Price != price)
                 {
                     coach.Price = price;
-                    await CreatePrice(coach, token);
+                    await CreatePrice(coach, true, token);
                 }
                 await CoachRepo.Update(coach, uow, token);
                 await uow.SaveChanges(token);
@@ -137,12 +150,12 @@ namespace Courseware.Coach.Subscriptions
                 }
                 if (coach.StripeProductId == null)
                 {
-                    await CreateProduct(coach, token);
+                    await CreateProduct(coach, false, token);
                 }
                 if (coach.Price != price)
                 {
                     coach.Price = price;
-                    await CreatePrice(coach, token);
+                    await CreatePrice(coach, false, token);
                 }
                 await CourseRepo.Update(coach, uow, token);
                 await uow.SaveChanges(token);
@@ -171,19 +184,19 @@ namespace Courseware.Coach.Subscriptions
                     CoachId = coachId,
                     IsFunded = false
                 };
-                await HydrateSubscription(sub, coach, user.ObjectId, token);
+                await HydrateSubscription(sub, coach, user.ObjectId, true, token);
                 user.Subscriptions.Add(sub);
                 await UserRepo.Update(user, uow, token);
                 await uow.SaveChanges(token);
                 return sub;
             }
         }
-        protected async Task HydrateSubscription(Sub subscription, IPriced priced, string objectId, CancellationToken token = default)
+        protected async Task HydrateSubscription(Sub subscription, IPriced priced, string objectId, bool isSubscription = false, CancellationToken token = default)
         {
             subscription.Price = priced.Price;
-            var opts = new SessionCreateOptions()
+            var opts = new Stripe.Checkout.SessionCreateOptions()
             {
-                Mode = "payment",
+                Mode = !isSubscription ? "payment" : "subscription",
                 SuccessUrl = PaymentSuccessUri,
                 LineItems = new List<SessionLineItemOptions>()
                 {
@@ -224,7 +237,7 @@ namespace Courseware.Coach.Subscriptions
                     CourseId = courseId,
                     IsFunded = false
                 };
-                await HydrateSubscription(sub, coach, objectId, token);
+                await HydrateSubscription(sub, coach, objectId, false, token);
                 user.Subscriptions.Add(sub);
                 await UserRepo.Update(user, uow, token);
                 await uow.SaveChanges(token);
@@ -253,7 +266,7 @@ namespace Courseware.Coach.Subscriptions
             }
         }
 
-        public async Task<Sub?> FinishSubscription(Guid subscriptionId, string objectId, CancellationToken token = default)
+        public async Task<Sub?> FinishSubscription(Guid subscriptionId, string objectId, decimal total, CancellationToken token = default)
         {
             await using (var uow = UserRepo.CreateUnitOfWork())
             {
@@ -265,21 +278,30 @@ namespace Courseware.Coach.Subscriptions
                 var user = users.Items.Single();
                 var sub = user.Subscriptions.Single(s => s.Id == subscriptionId);
                 IPriced? priced = null;
+                int? daysToComplete = null;
                 if(sub.CourseId != null)
                 {
-                    priced = await CourseRepo.Get(sub.CourseId.Value, uow, token: token);
+                    var course = await CourseRepo.Get(sub.CourseId.Value, uow, token: token);
+                    priced = course;
+                    daysToComplete = course?.DaysToComplete;
                 }
                 else if(sub.CoachId != null)
                 {
                     priced = await CoachRepo.Get(sub.CoachId.Value, uow, token: token);
+                    sub.Payments.Add(new RecurringPayment()
+                    {
+                        Amount = total,
+                        PaymentDate = DateTime.UtcNow
+                    });
                 }
                 if(priced == null)
                 {
                     throw new ArgumentException("Course or Coach not found");
                 }
+                sub.Price = total;
                 sub.IsFunded = true;
                 sub.StartDate = DateTime.UtcNow;
-                sub.EndDate = DateTime.UtcNow.AddDays(priced.DaysToComplete);
+                sub.EndDate = DateTime.UtcNow.AddDays(daysToComplete ?? 30);
                 await UserRepo.Update(user, uow, token);
                 await uow.SaveChanges(token);
                 return sub;
@@ -323,6 +345,66 @@ namespace Courseware.Coach.Subscriptions
                 }
             }
             return null;
+        }
+
+        public async Task<PayoutAccount?> AddPayoutAccount(Guid coachId, PayoutAccount account, CancellationToken token = default)
+        {
+            var coach = await CoachRepo.Get(coachId, token: token);
+            if(coach == null)
+                throw new ArgumentException("Coach not found");
+            var totalPercent = coach.PayoutAccounts.Sum(p => p.PayoutPercentage);
+            totalPercent += account.PayoutPercentage;
+            if(totalPercent > 1)
+                throw new ArgumentException("Total payout percentage cannot exceed 100%");
+            var options = new AccountCreateOptions()
+            {
+                Type = "custom",
+                Country = account.Country,
+                Email = account.Email,
+                BusinessType = account.AccountType.ToString(),
+                Capabilities = new AccountCapabilitiesOptions
+                {
+                    Transfers = new AccountCapabilitiesTransfersOptions
+                    {
+                        Requested = true
+                    }
+                }
+            };
+            var acct = await AccountService.CreateAsync(options, cancellationToken: token);
+            if(acct == null)
+                throw new InvalidOperationException("Account creation failed");
+            account.AccountId = acct.Id;
+            var boptions = new ExternalAccountCreateOptions()
+            {
+
+                ExternalAccount = new AccountBankAccountOptions()
+                {
+                    AccountNumber = account.AccountNumber,
+                    Country = account.Country,
+                    Currency = account.Currency,
+                    AccountHolderName = account.AccountHolderName,
+                    AccountHolderType = account.AccountHolderType,
+                    RoutingNumber = account.RoutingNumber
+                }
+            };
+            await ExtAccountService.CreateAsync(account.AccountId, boptions, cancellationToken: token);
+            coach.PayoutAccounts.Add(account);
+            await CoachRepo.Update(coach, token: token);
+            return account;
+        }
+
+        public Task<decimal?> PayoutCoach(Guid coachId, CancellationToken token = default)
+        {
+            throw new NotImplementedException();
+        }
+
+        public async Task CancelSubscription(Guid subscriptionId, string objectId, CancellationToken token = default)
+        {
+            var users = await UserRepo.Get(filter: u => u.ObjectId == objectId, token: token);
+            var user = users.Items.Single();
+            var sub = user.Subscriptions.Single(s => s.Id == subscriptionId);
+            sub.IsFunded = false;
+            await UserRepo.Update(user, token: token);
         }
     }
 }

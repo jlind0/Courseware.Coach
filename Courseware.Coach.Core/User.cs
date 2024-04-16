@@ -63,7 +63,6 @@ namespace Courseware.Coach.Core
         Guid Id { get; set; }
         decimal? Price { get; set; }
         string? StripeProductId { get; set; }
-        int DaysToComplete { get; set; }
         string Name { get; set; }
         string? StripePriceId { get; set; }
         string? StripeUrl { get; set; }
@@ -79,7 +78,6 @@ namespace Courseware.Coach.Core
         [Required]
         public string Slug { get; set; } = null!;
         public List<CoachInstance> Instances { get; set; } = [];
-        public int DaysToComplete { get; set; } = 90;
         public string NativeLocale { get; set; } = "en-US";
         public string? DefaultVoiceName { get; set; }
         public decimal? Price { get; set; }
@@ -89,6 +87,28 @@ namespace Courseware.Coach.Core
         public bool? IsPublished { get; set; } = false;
         public string? ThumbnailImageId { get; set; }
         public string? BannerImageId { get; set; }
+        public List<PayoutAccount> PayoutAccounts { get; set; } = [];
+    }
+    public class PayoutAccount
+    {
+        public Guid Id { get; set; } = Guid.NewGuid();
+        public string Country { get; set; } = null!;
+        public string Currency { get; set; } = null!;
+        public string AccountNumber { get; set; } = null!;
+        public string RoutingNumber { get; set; } = null!;
+        public string AccountHolderName { get; set; } = null!;
+        public string AccountHolderType { get; set; } = null!;
+        public string? AccountId { get; set; }
+        public decimal PayoutPercentage { get; set; }
+        public string Email { get; set; } = null!;
+        public AccountTypes AccountType { get; set; }
+    }
+    public enum AccountTypes
+    {
+        company,
+        government_entity,
+        individual,
+        non_profit
     }
     public class CoachInstance
     {
@@ -142,6 +162,12 @@ namespace Courseware.Coach.Core
         [Required]
         public int Order { get; set; }
     }
+    public class RecurringPayment
+    {
+        public DateTime PaymentDate { get; set; } = DateTime.UtcNow;
+        public decimal Amount { get; set; }
+        public bool IsPaidOut { get; set; } = false;
+    }
     public class Subscription
     { 
         public Guid Id { get; set; } = Guid.NewGuid();
@@ -156,5 +182,7 @@ namespace Courseware.Coach.Core
         public string Locale { get; set; } = "en-US";
         public string? VoiceName { get; set; }
         public string? StripeSessionUrl { get; set; }
+        public List<RecurringPayment> Payments { get; set; } = [];
+        public bool IsPaidOut { get; set; } = false;
     }
 }
