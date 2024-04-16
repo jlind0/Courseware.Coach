@@ -57,6 +57,18 @@ namespace Courseware.Coach.LLM
             get => currentPrompt;
             protected set => this.RaiseAndSetIfChanged(ref currentPrompt, value);
         }
+        private Quiz? currentQuiz;
+        public Quiz? CurrentQuiz
+        {
+            get => currentQuiz;
+            protected set => this.RaiseAndSetIfChanged(ref currentQuiz, value);
+        }
+        private QuizQuestion? currentQuizQuestion;
+        public QuizQuestion? CurrentQuizQuestion
+        {
+            get => currentQuizQuestion;
+            protected set => this.RaiseAndSetIfChanged(ref currentQuizQuestion, value);
+        }
         private User? currentUser;
         public User? CurrentUser
         {
@@ -247,7 +259,16 @@ namespace Courseware.Coach.LLM
             }
             if(CurrentSubscription?.CurrentLessonId != null)
             {
+                
                 CurrentLesson = CurrentCourse.Lessons.SingleOrDefault(l => l.Id == CurrentSubscription.CurrentLessonId);
+                if (CurrentLesson != null)
+                {
+                    var idx = CurrentCourse.Lessons.IndexOf(CurrentLesson);
+                    if (idx > 0)
+                        CurrentLesson = CurrentCourse.Lessons[idx - 1];
+                    else
+                        CurrentLesson = null;
+                }
             }
             if (CurrentConversationId == null)
             {
@@ -267,14 +288,22 @@ namespace Courseware.Coach.LLM
                 throw new InvalidOperationException("Conversation not started");
             return CurrentCourse;
         }
-        public Lesson? GetNextLesson()
+        public async Task<Lesson?> GetNextLesson()
         {
             CurrentPrompt = null;
+            CurrentQuiz = null;
+            CurrentQuizQuestion = null;
             if (CurrentCourse == null)
                 throw new InvalidOperationException("Course not started");
             if (CurrentLesson == null)
             {
                 CurrentLesson = CurrentCourse.Lessons.OrderBy(l => l.Order).FirstOrDefault();
+                CurrentQuiz = CurrentLesson?.Quiz;
+                if(CurrentSubscription != null)
+                {
+                    CurrentSubscription.CurrentLessonId = CurrentLesson?.Id;
+                    await SubscriptionManager.UpdateSubscription(CurrentSubscription, CurrentUser!.ObjectId);
+                }
                 return CurrentLesson;
             }
             foreach(var lesson in CurrentCourse.Lessons.OrderBy(l => l.Order))
@@ -282,6 +311,12 @@ namespace Courseware.Coach.LLM
                 if (lesson.Id != CurrentLesson.Id && lesson.Order >= CurrentLesson.Order)
                 {
                     CurrentLesson = lesson;
+                    CurrentQuiz = lesson.Quiz;
+                    if (CurrentSubscription != null)
+                    {
+                        CurrentSubscription.CurrentLessonId = CurrentLesson?.Id;
+                        await SubscriptionManager.UpdateSubscription(CurrentSubscription, CurrentUser!.ObjectId);
+                    }
                     return lesson;
                 }
             }
@@ -394,6 +429,11 @@ namespace Courseware.Coach.LLM
             CurrentConversationId = null;
             CurrentCoach = null;
             CurrentCoachInstance = null;
+            CurrentCourse = null;
+            CurrentLesson = null;
+            CurrentPrompt = null;
+            CurrentQuiz = null;
+            CurrentQuizQuestion = null;
         }
         public async Task<CH?> StartConversationWithCoach(Guid coachId, CancellationToken token = default)
         {
@@ -500,6 +540,58 @@ namespace Courseware.Coach.LLM
             if (!IsLoggedIn)
                 throw new InvalidOperationException("No user logged in.");
             return SubscriptionManager.IsSubscribedToCourse(courseId, CurrentUser!.ObjectId, token);
+        }
+
+        public QuizQuestion? GetNextQuizQuestion()
+        {
+            if (CurrentQuiz == null)
+                return null;
+            var questions = CurrentQuiz.Questions.OrderBy(q => q.Order);
+            if (CurrentQuizQuestion == null)
+            {
+                CurrentQuizQuestion = questions.FirstOrDefault();
+                return CurrentQuizQuestion;
+            }
+            else
+            {
+                foreach(var q in questions)
+                {
+                    if(q.Id != CurrentQuizQuestion.Id && q.Order >= CurrentQuizQuestion.Order)
+                    {
+                        CurrentQuizQuestion = q;
+                        return CurrentQuizQuestion;
+                    }
+                }
+            }
+            CurrentQuiz = null;
+            CurrentQuizQuestion = null;
+            return null;
+        }
+
+        public async Task<bool> SubmitAnswer(string answerOption, CancellationToken token = default)
+        {
+            if (!IsLoggedIn)
+                throw new InvalidOperationException("No user logged in");
+            if(CurrentQuizQuestion == null)
+                throw new ArgumentException("No quiz question started");
+            var options = CurrentQuizQuestion.Options.ToDictionary(o => o.OptionCharachter);
+            if (options.TryGetValue(answerOption, out var option))
+            {
+                if (CurrentSubscription != null)
+                {
+                    var answer = new QuizAnswer()
+                    {
+                        LessonId = CurrentLesson!.Id,
+                        QuestionId = CurrentQuizQuestion.Id,
+                        OptionCharachter = answerOption,
+                        IsCorrect = option.IsCorrect
+                    };
+                    CurrentSubscription.Answers.Add(answer);
+                    await SubscriptionManager.UpdateSubscription(CurrentSubscription, CurrentUser!.ObjectId, token);
+                }
+                return option.IsCorrect;
+            }
+            return false;
         }
     }
 }

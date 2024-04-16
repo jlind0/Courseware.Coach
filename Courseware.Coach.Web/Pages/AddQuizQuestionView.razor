@@ -1,0 +1,66 @@
+﻿@inherits ReactiveComponentBase<AddQuizQuestionViewModel>
+@if (ViewModel != null)
+{
+    <AlertView Alert="ViewModel.Alert" />
+    <h3>Quiz Question <button class="btn btn-primary" @onclick="ViewModel.Open.BindCommand<MouseEventArgs>()"><i class="fa-solid fa-plus"></i> @ViewModel.Parent.Data.Name</button></h3>
+    <TelerikDialog @ref="dlg" @bind-Visible="ViewModel.IsOpen" Title="Add Quiz Question">
+        <DialogContent>
+            
+            <TelerikForm Model="ViewModel" OnValidSubmit="ViewModel.Add.BindCommand<EditContext>()">
+                <FormValidation>
+                    <DataAnnotationsValidator />
+                </FormValidation>
+                <FormItems>
+                    <FormItem Field="Data.Text" EditorType="FormEditorType.TextArea" LabelText="Text" />
+                    <FormItem Field="Data.Order" LabelText="Order" />
+                </FormItems>
+            </TelerikForm>
+            <TelerikForm Model="ViewModel.AddQuizOptionViewModel" OnValidSubmit="ViewModel.AddQuizOptionViewModel.Add.BindCommand<EditContext>()">
+                <FormItems>
+                    <FormItem Field="Data.OptionCharachter" LabelText="Charachater"/>
+                    <FormItem Field="Data.Text" EditorType="FormEditorType.TextArea" LabelText="Option Text" />
+                    <FormItem Field="Data.IsCorrect" LabelText="Is Correct" />
+                </FormItems>
+            </TelerikForm>
+            <table>
+                <tr>
+                    <th>Charachter</th>
+                    <th>Text</th>
+                    <th>Is Correct</th>
+                    <th>Remove</th>
+                </tr>
+                @foreach(var option in ViewModel.Data.Options.OrderBy(c => c.OptionCharachter))
+                {
+                    <tr>
+                        <td><TelerikTextBox @bind-Value="option.OptionCharachter"/> </td>
+                        <td><TelerikTextArea @bind-Value="option.Text"/></td>
+                        <td><TelerikCheckBox @bind-Value="option.IsCorrect"/></td>
+                        <td><TelerikButton OnClick="ViewModel.RemoveOption.BindCommand<MouseEventArgs>(option.OptionCharachter)"><i class="fa-solid fa-xmark"></i></TelerikButton></td>
+                    </tr>
+                }
+            </table>
+        </DialogContent>
+        <DialogButtons>
+            <TelerikButton OnClick="ViewModel.Cancel.BindCommand<MouseEventArgs>()">Cancel</TelerikButton>
+        </DialogButtons>
+    </TelerikDialog>
+}
+@code{
+    private TelerikDialog dlg = null!;
+    protected void Reload()
+    {
+        dlg.Refresh();
+        this.StateHasChanged();
+    }
+    override protected async Task OnInitializedAsync()
+    {
+        this.WhenPropertyChanged(p => p.ViewModel).Subscribe(p =>
+        {
+            if (ViewModel != null)
+            {
+                ViewModel.Reload = Reload;
+            }
+        });
+        await base.OnInitializedAsync();
+    }
+}

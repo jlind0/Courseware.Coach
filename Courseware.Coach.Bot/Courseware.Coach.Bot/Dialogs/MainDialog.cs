@@ -148,6 +148,11 @@ namespace Courseware.Coach.Bot.Dialogs
                 StartSubscriptionToCourse,
                 FinishSubscriptionToCourse
             };
+            var takeQuiz = new WaterfallStep[]
+            {
+                StartQuiz,
+                AnswerQuizQuestion
+            };
             AddDialog(new WaterfallDialog(LoginPickCoach, waterfallSteps));
             AddDialog(new WaterfallDialog(ChatWithCoach, coachSteps));
             AddDialog(new WaterfallDialog(MainMenu, mainMenuSteps));
@@ -159,6 +164,7 @@ namespace Courseware.Coach.Bot.Dialogs
             AddDialog(new WaterfallDialog(FinishLesson, finishLesson));
             AddDialog(new WaterfallDialog(SubscribeToCoach, subscribeToCoach));
             AddDialog(new WaterfallDialog(SubscribeToCourse, subscribeToCourse));
+            AddDialog(new WaterfallDialog(TakeQuiz, takeQuiz));
             AddDialog(new TextPrompt(nameof(TextPrompt)));
             AddDialog(new ChoicePrompt(nameof(ChoicePrompt)));
             AddDialog(new ConfirmPrompt(nameof(ConfirmPrompt)));
@@ -176,6 +182,7 @@ namespace Courseware.Coach.Bot.Dialogs
         protected const string FinishLesson = nameof(FinishLesson);
         protected const string SubscribeToCoach = nameof(SubscribeToCoach);
         protected const string SubscribeToCourse = nameof(SubscribeToCourse);
+        protected const string TakeQuiz = nameof(TakeQuiz);
         private async Task<DialogTurnResult> StartSubscriptionToCoach(WaterfallStepContext stepContext, CancellationToken token)
         {
             var coachId = (Guid)stepContext.Options;
@@ -247,8 +254,39 @@ namespace Courseware.Coach.Bot.Dialogs
             else
                 return await stepContext.ReplaceDialogAsync(MainMenu, null, token);
         }
+        private async Task<DialogTurnResult> StartQuiz(WaterfallStepContext stepContext, CancellationToken token)
+        {
+            var LLM = Factory.GetLLM(stepContext.Context.Activity.Conversation.Id);
+            var question = LLM.GetNextQuizQuestion();
+            if (question == null)
+                return await stepContext.ReplaceDialogAsync(FinishLesson, null, token);
+            
+            string options = question.Options.Select(question => $"{question.OptionCharachter}: {question.Text}").Aggregate((a, b) => $"{a}\n{b}");
+            
+            return await stepContext.PromptAsync(nameof(ChoicePrompt), 
+                new PromptOptions { 
+                    Prompt = MessageFactory.Text($"{question.Text}\n{options}"), 
+                    Choices = ChoiceFactory.ToChoices(
+                        question.Options.Select(o => o.OptionCharachter.ToString()).ToList()) }, token);
+        }
+        private async Task<DialogTurnResult> AnswerQuizQuestion(WaterfallStepContext stepContext, CancellationToken token)
+        {
+            var choice = (FoundChoice)stepContext.Result;
+            var LLM = Factory.GetLLM(stepContext.Context.Activity.Conversation.Id);
+            bool isCorrect = await LLM.SubmitAnswer(choice.Value, token);
+            if (isCorrect)
+                await stepContext.Context.SendActivityAsync(MessageFactory.Text("Correct!"), token);
+            else
+                await stepContext.Context.SendActivityAsync(MessageFactory.Text("Incorrect!"), token);
+            return await stepContext.ReplaceDialogAsync(TakeQuiz, null, token);
+        }
         private async Task<DialogTurnResult> StartFinishLesson(WaterfallStepContext stepContext, CancellationToken cancellationToken)
         {
+            var LLM = Factory.GetLLM(stepContext.Context.Activity.Conversation.Id);
+            if(LLM.CurrentQuiz != null)
+            {
+                return await stepContext.ReplaceDialogAsync(TakeQuiz, null, cancellationToken);
+            }
             return await stepContext.PromptAsync(nameof(ConfirmPrompt), new PromptOptions { Prompt = MessageFactory.Text("You have finished the lesson, would you like to start the next one?") });
         }
         private async Task<DialogTurnResult> RecieveFinishLesson(WaterfallStepContext stepContext, CancellationToken cancellationToken)
@@ -317,7 +355,7 @@ namespace Courseware.Coach.Bot.Dialogs
         protected async Task<DialogTurnResult> StartLesson(WaterfallStepContext stepContext, CancellationToken token)
         {
             var LLM = Factory.GetLLM(stepContext.Context.Activity.Conversation.Id);
-            var lesson = LLM.GetNextLesson();
+            var lesson = await LLM.GetNextLesson();
             if(lesson == null)
             {
                 await stepContext.Context.SendActivityAsync(MessageFactory.Text("No lesson available."), token);

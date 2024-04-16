@@ -4,6 +4,7 @@ using Courseware.Coach.Data;
 using Courseware.Coach.Storage.Core;
 using DynamicData.Binding;
 using Microsoft.CognitiveServices.Speech.Translation;
+using Microsoft.EntityFrameworkCore.Query.Internal;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
 using System.Collections.ObjectModel;
@@ -319,12 +320,15 @@ namespace Courseware.Coach.ViewModels
     public class LessonViewModel : ReactiveObject
     {
         public AddPromptViewModel AddPromptViewModel { get; }
+        public AddQuizQuestionViewModel AddQuizQuestionViewModel { get; }
         public Lesson Data { get; }
         protected ILogger Logger { get; }
         public CourseViewModel Parent { get; }
         public ObservableCollection<PromptViewModel> Prompts { get; } = new ObservableCollection<PromptViewModel>();
         public ReactiveCommand<Prompt, Unit> AddPrompt { get; }
         public ReactiveCommand<Guid, Unit> RemovePrompt { get; }
+        public ReactiveCommand<QuizQuestion, Unit> AddQuestion { get; }
+        public ReactiveCommand<Guid, Unit> RemoveQuestion { get; }
         public LessonViewModel(Lesson data, CourseViewModel parent, ILogger logger)
         {
             Data = data;
@@ -334,7 +338,40 @@ namespace Courseware.Coach.ViewModels
                 Prompts.Add(new PromptViewModel(x, this, logger));
             AddPrompt = ReactiveCommand.CreateFromTask<Prompt>(DoAddPrompt);
             RemovePrompt = ReactiveCommand.CreateFromTask<Guid>(DoRemovePrompt);
+            AddQuestion = ReactiveCommand.CreateFromTask<QuizQuestion>(DoAddQuestion);
+            RemoveQuestion = ReactiveCommand.CreateFromTask<Guid>(DoRemoveQuestion);
             AddPromptViewModel = new AddPromptViewModel(this, logger);
+            AddQuizQuestionViewModel = new AddQuizQuestionViewModel(this, logger);  
+        }
+        private async Task DoAddQuestion(QuizQuestion question, CancellationToken token)
+        {
+            try
+            {
+                Data.Quiz ??= new Quiz();
+                Data.Quiz.Questions.Add(question);
+                await Parent.Save.Execute().GetAwaiter();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, ex.Message);
+                await Parent.Alert.Handle(ex.Message).GetAwaiter();
+            }
+        }
+        private async Task DoRemoveQuestion(Guid id, CancellationToken token)
+        {
+            try
+            {
+                var question = Data.Quiz?.Questions.SingleOrDefault(x => x.Id == id);
+                if (question == null)
+                    throw new InvalidDataException();
+                Data.Quiz.Questions.Remove(question);
+                await Parent.Save.Execute().GetAwaiter();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, ex.Message);
+                await Parent.Alert.Handle(ex.Message).GetAwaiter();
+            }
         }
         private async Task DoRemovePrompt(Guid id, CancellationToken token)
         {
@@ -407,6 +444,90 @@ namespace Courseware.Coach.ViewModels
                 Logger.LogError(ex, ex.Message);
                 await Alert.Handle(ex.Message).GetAwaiter();
             }
+        }
+    }
+    public class AddQuizQuestionViewModel : ReactiveObject
+    {
+        public Interaction<string, bool> Alert { get; } = new Interaction<string, bool>();
+        private bool isOpen = false;
+        public Action Reload { 
+            get; 
+            set; } = null!;
+        public bool IsOpen
+        {
+            get => isOpen;
+            set => this.RaiseAndSetIfChanged(ref isOpen, value);
+        }
+        private QuizQuestion data = new QuizQuestion();
+        public QuizQuestion Data
+        {
+            get => data;
+            set => this.RaiseAndSetIfChanged(ref data, value);
+        }
+        public ReactiveCommand<Unit, Unit> Add { get; }
+        public ReactiveCommand<Unit, Unit> Open { get; }
+        public ReactiveCommand<Unit, Unit> Cancel { get; }
+        public ReactiveCommand<QuizOption, Unit> AddOption { get; }
+        public ReactiveCommand<string, Unit> RemoveOption { get; }
+        protected ILogger Logger { get; }
+        public LessonViewModel Parent { get; }
+        public AddQuizOptionViewModel AddQuizOptionViewModel { get; }
+        public AddQuizQuestionViewModel(LessonViewModel parent, ILogger logger)
+        {
+            Logger = logger;
+            Parent = parent;
+            Add = ReactiveCommand.CreateFromTask(DoAdd);
+            AddOption = ReactiveCommand.Create<QuizOption>(p =>
+            {
+                Data.Options.Add(p);
+                Reload();
+            });
+            RemoveOption = ReactiveCommand.Create<string>(id =>
+            {
+                var option = Data.Options.SingleOrDefault(x => x.OptionCharachter == id);
+                if (option == null)
+                    throw new InvalidDataException();
+                Data.Options.Remove(option);
+                Reload();
+            });
+            AddQuizOptionViewModel = new AddQuizOptionViewModel(AddOption, logger);
+            Open = ReactiveCommand.Create(() => { IsOpen = true; });
+            Cancel = ReactiveCommand.Create(() => { IsOpen = false; });
+        }
+        private async Task DoAdd(CancellationToken token)
+        {
+            try
+            {
+                await Parent.AddQuestion.Execute(Data).GetAwaiter();
+                IsOpen = false;
+                Data = new QuizQuestion();
+                Reload();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, ex.Message);
+                await Alert.Handle(ex.Message).GetAwaiter();
+            }
+        }
+    }
+    public class AddQuizOptionViewModel : ReactiveObject
+    {
+        private QuizOption data = new QuizOption();
+        public QuizOption Data
+        {
+            get => data;
+            set => this.RaiseAndSetIfChanged(ref data, value);
+        }
+        public ReactiveCommand<Unit, Unit> Add { get; }
+        protected ILogger Logger { get; }
+        public AddQuizOptionViewModel(ReactiveCommand<QuizOption, Unit> add, ILogger logger)
+        {
+            
+            Add = ReactiveCommand.CreateFromTask(async () => {
+                await add.Execute(Data).GetAwaiter();
+                Data = new QuizOption();
+                });
+            Logger = logger;
         }
     }
     public class PromptViewModel : ReactiveObject

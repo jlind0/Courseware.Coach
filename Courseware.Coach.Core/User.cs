@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Security.Claims;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -152,6 +153,29 @@ namespace Courseware.Coach.Core
         [Required]
         public int Order { get; set; }
         public List<Prompt> Prompts { get; set; } = [];
+        public Quiz? Quiz { get; set; }
+    }
+    public class Quiz
+    {
+        public List<QuizQuestion> Questions { get; set; } = [];
+    }
+    public class QuizQuestion
+    {
+        [Required]
+        public Guid Id { get; set; } = Guid.NewGuid();
+        [Required]
+        public int Order { get; set; }
+        [Required]
+        public string Text { get; set; } = null!;
+        public List<QuizOption> Options { get; set; } = [];
+    }
+    public class QuizOption
+    {
+        [Required]
+        public string OptionCharachter { get; set; } = null!;
+        [Required]
+        public string Text { get; set; } = null!;
+        public bool IsCorrect { get; set; }
     }
     public class Prompt
     {
@@ -167,6 +191,13 @@ namespace Courseware.Coach.Core
         public DateTime PaymentDate { get; set; } = DateTime.UtcNow;
         public decimal Amount { get; set; }
         public bool IsPaidOut { get; set; } = false;
+    }
+    public class QuizAnswer
+    {
+        public Guid LessonId { get; set; }
+        public Guid QuestionId { get; set; }
+        public string OptionCharachter { get; set; } = null!;
+        public bool IsCorrect { get; set; }
     }
     public class Subscription
     { 
@@ -184,5 +215,6 @@ namespace Courseware.Coach.Core
         public string? StripeSessionUrl { get; set; }
         public List<RecurringPayment> Payments { get; set; } = [];
         public bool IsPaidOut { get; set; } = false;
+        public List<QuizAnswer> Answers { get; set; } = [];
     }
 }

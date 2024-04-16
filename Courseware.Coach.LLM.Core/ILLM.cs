@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Net.Quic;
 using System.Text;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
@@ -22,6 +23,8 @@ namespace Courseware.Coach.LLM.Core
         Lesson? CurrentLesson { get; }
         Prompt? CurrentPrompt { get; }
         User? CurrentUser { get; }
+        Quiz? CurrentQuiz { get; }
+        QuizQuestion? CurrentQuizQuestion { get; }
         bool IsLoggedIn { get; }
         string? CurrentVoiceName { get; }
         string? CurrentLocale { get; }
@@ -38,8 +41,10 @@ namespace Courseware.Coach.LLM.Core
         Task ChatWithCoach(string message, CancellationToken token = default);
         Task ChatWithCoachInstance(string message, CancellationToken token = default);
         Task EndConversation(CancellationToken token = default);
-        Lesson? GetNextLesson();
+        Task<Lesson?> GetNextLesson();
         Prompt? GetNextPrompt();
+        QuizQuestion? GetNextQuizQuestion();
+        Task<bool> SubmitAnswer(string answerOption, CancellationToken token = default);
         Task<Course?> StartCourse(Guid courseId, CancellationToken token = default);
         Task SendMessageForCurrentPrompt(string message, CancellationToken token = default);
         Task<bool> IsSubscribedToCoach(Guid coachId, CancellationToken token = default);

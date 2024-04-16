@@ -60,6 +60,38 @@
                 </FormItems>
             </TelerikForm>
         }
+        <AddQuizQuestionView ViewModel="lesson.AddQuizQuestionViewModel"/>
+        @if(lesson.Data != null && lesson.Data.Quiz != null)
+        {
+            @foreach (var quizQuestion in lesson.Data.Quiz.Questions.OrderBy(q => q.Order))
+            {
+                <TelerikForm Model="quizQuestion" OnValidSubmit="ViewModel.Save.BindCommand<EditContext>()">
+                    <FormValidation>
+                        <DataAnnotationsValidator />
+                    </FormValidation>
+                    <FormItems>
+                        <FormItem Field="Text" EditorType="FormEditorType.TextArea" LabelText="Question Text" />
+                        <FormItem Field="Order" LabelText="Question Order" />
+                    </FormItems>
+                </TelerikForm>
+                <table>
+                    <tr>
+                        <th>Charachter</th>
+                        <th>Text</th>
+                        <th>Is Correct</th>
+                    </tr>
+                    @foreach (var option in quizQuestion.Options.OrderBy(c => c.OptionCharachter))
+                    {
+                        <tr>
+                            <td><TelerikTextBox @bind-Value="option.OptionCharachter" /> </td>
+                            <td><TelerikTextArea @bind-Value="option.Text" /></td>
+                            <td><TelerikCheckBox @bind-Value="option.IsCorrect" /></td>
+                        </tr>
+                    }
+                </table>
+            }
+        }
+        
     }
 }
 
