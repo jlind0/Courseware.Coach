@@ -42,6 +42,8 @@ namespace Courseware.Coach.LLM.Core
         Prompt? GetNextPrompt();
         Task<Course?> StartCourse(Guid courseId, CancellationToken token = default);
         Task SendMessageForCurrentPrompt(string message, CancellationToken token = default);
+        Task<bool> IsSubscribedToCoach(Guid coachId, CancellationToken token = default);
+        Task<bool> IsSubscribedToCourse(Guid courseId, CancellationToken token = default);
     }
     
 }

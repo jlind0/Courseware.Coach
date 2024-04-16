@@ -67,7 +67,7 @@ namespace Courseware.Coach.LLM
             }
         }
 
-        public async Task<ConversationHistory?> GetHistory(string apiKey, Guid conversationId, CancellationToken token = default)
+        public async Task<ConversationHistory?> GetHistory(string apiKey, string conversationId, CancellationToken token = default)
         {
             string route = $"/conversation/history?id={conversationId}";
             using (var client = new HttpClient())
@@ -119,6 +119,8 @@ namespace Courseware.Coach.LLM
         public async Task UploadUserInfo(string apiKey, string email, string slug, string? info = null, CancellationToken token = default)
         {
             string route = "/clone/user_info";
+            if (info == null)
+                return;
             if (info != null)
             {
                 Regex wordPattern = new Regex(@"\b\w+\b");

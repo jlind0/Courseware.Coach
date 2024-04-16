@@ -296,7 +296,7 @@ namespace Courseware.Coach.Subscriptions
                 {
                     if (sub.StartDate == null && sub.EndDate == null)
                         return sub;
-                    if ((sub.StartDate ?? DateTime.UtcNow) >= DateTime.UtcNow && (sub.EndDate ?? DateTime.UtcNow) >= DateTime.UtcNow)
+                    if (sub.StartDate <= DateTime.UtcNow && sub.EndDate >= DateTime.UtcNow)
                     {
                         return sub;
                     }
@@ -310,12 +310,13 @@ namespace Courseware.Coach.Subscriptions
             var users = await UserRepo.Get(filter: u => u.ObjectId == objectId, token: token);
             if (users.Count > 0)
             {
-                foreach (var sub in users.Items.Single().Subscriptions.Where(
+                var user = users.Items.Single();
+                foreach (var sub in user.Subscriptions.Where(
                     s => s.CoachId == coachId && s.IsFunded).OrderByDescending(s => s.EndDate))
                 {
                     if (sub.StartDate == null && sub.EndDate == null)
                         return sub;
-                    if ((sub.StartDate ?? DateTime.UtcNow) >= DateTime.UtcNow && (sub.EndDate ?? DateTime.UtcNow) >= DateTime.UtcNow)
+                    if (sub.StartDate <= DateTime.UtcNow && sub.EndDate >= DateTime.UtcNow)
                     {
                         return sub;
                     }

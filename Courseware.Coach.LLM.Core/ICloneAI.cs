@@ -76,7 +76,7 @@ namespace Courseware.Coach.LLM.Core
     {
         Task UploadUserInfo(string apiKey, string email, string slug, string? info = null, CancellationToken token = default);
         Task<NewConversationResponse?> StartConversation(string apiKey, string slug, string? instanceSlug = null, string? email = null, CancellationToken token = default);
-        Task<ConversationHistory?> GetHistory(string apiKey, Guid conversationId, CancellationToken token = default);
+        Task<ConversationHistory?> GetHistory(string apiKey, string conversationId, CancellationToken token = default);
         Task<CloneResponse?> GenerateResponse(string apiKey, ConversationRequestBody body, CancellationToken token = default);
         Task<Clone?> GetClone(string apiKey, string slug, CancellationToken token = default);
     }

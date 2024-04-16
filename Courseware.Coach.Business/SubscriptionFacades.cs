@@ -30,9 +30,10 @@ namespace Courseware.Coach.Business
             var oldCourse = await Get(entity.Id, work, token);
             if(oldCourse == null)
                 throw new InvalidDataException();
+            await base.Update(entity, work, token);
             if (oldCourse.Price != entity.Price)
                 await SubscriptionManager.SetPriceForCourse(entity.Id, entity.Price ?? 0m, token);
-            return await base.Update(entity, work, token);
+            return ( await Get(entity.Id, work, token)) ?? throw new InvalidDataException();
         }
     }
     public class CoachFacade : BusinessRepositoryFacade<CH, UnitOfWork>
@@ -54,9 +55,10 @@ namespace Courseware.Coach.Business
             var oldCoach = await Get(entity.Id, work, token);
             if (oldCoach == null)
                 throw new InvalidDataException();
+            await base.Update(entity, work, token);
             if (oldCoach.Price != entity.Price)
                 await SubscriptionManager.SetPriceForCoach(entity.Id, entity.Price ?? 0m, token);
-            return await base.Update(entity, work, token);
+            return (await Get(entity.Id, work, token)) ?? throw new InvalidDataException();
         }
     }
 }

@@ -5,6 +5,7 @@ using Courseware.Coach.LLM.Core;
 using Courseware.Coach.Subscriptions.Core;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.VisualBasic;
 using ReactiveUI;
 using System;
 using System.Collections.Concurrent;
@@ -395,14 +396,35 @@ namespace Courseware.Coach.LLM
                 if (CurrentUser == null)
                     return null;
                 CurrentSubscription = await SubscriptionManager.GetCurrentSubscriptionForCoach(coachId, CurrentUser.ObjectId, token);
-                /*if (!await SubscriptionManager.IsSubscribedToCoach(coachId, CurrentUser.ObjectId, token))
+                if (!await SubscriptionManager.IsSubscribedToCoach(coachId, CurrentUser.ObjectId, token))
                     return null;
-                await CloneAI.UploadUserInfo(CurrentCoach.APIKey, CurrentUser.Email, CurrentCoach.Slug, CurrentUser.Bio, token: token);*/
+                await CloneAI.UploadUserInfo(CurrentCoach.APIKey, CurrentUser.Email, CurrentCoach.Slug, GetUserInfo(), token: token);
+                if(CurrentSubscription?.ConversationId != null)
+                {
+                    CurrentConversationId = CurrentSubscription.ConversationId;
+                    var history = await CloneAI.GetHistory(CurrentCoach.APIKey, CurrentConversationId, token);
+                    if (history != null)
+                    {
+                        foreach (var msg in history.history.OrderByDescending(h => h.created_at).Take(10).OrderBy(p => p.created_at))
+                        {
+                            if (msg.sender == "USER")
+                                await PushText(new CloneResponse() { text = $"You: {msg.text}" }, CurrentCoach.NativeLocale, CurrentCoach.DefaultVoiceName, token);
+                            else
+                                await PushText(new CloneResponse() { text = $"Coach: {msg.text}" }, CurrentCoach.NativeLocale, CurrentCoach.DefaultVoiceName, token);
+                        }
+                    }
+                    return CurrentCoach;
+                }
                 var resp = await CloneAI.StartConversation(CurrentCoach.APIKey, CurrentCoach.Slug, email: CurrentUser?.Email, token: token);
                 Logger.LogInformation("Conversation started");
                 if (resp != null)
                 {
                     CurrentConversationId = resp.@new.conversation_id;
+                    if(CurrentSubscription != null)
+                    {
+                        CurrentSubscription.ConversationId = CurrentConversationId;
+                        await SubscriptionManager.UpdateSubscription(CurrentSubscription, CurrentUser!.ObjectId, token);
+                    }
                     foreach(var msg in resp.@new.messages)
                     {
                         await PushText(new CloneResponse() { text = msg.text}, CurrentCoach.NativeLocale, CurrentCoach.DefaultVoiceName, token);
@@ -416,7 +438,13 @@ namespace Courseware.Coach.LLM
                 throw;
             }
         }
+        protected string? GetUserInfo()
+        {
+            if (CurrentUser == null)
+                return null;
+            return $"I am {CurrentUser.FirstName} {CurrentUser.LastName} who lives in {CurrentUser.Country ?? ""} with bio: {CurrentUser.Bio ?? ""}";
 
+        }
         public async Task<CoachInstance?> StartConversationWithCoachInstance(Guid coachId, CancellationToken token = default)
         {
             CurrentConversationId = null;
@@ -432,19 +460,35 @@ namespace Courseware.Coach.LLM
             return CurrentCoachInstance;
         }
 
-        public Task<Subscription?> SubscribeToCoach(Guid coachId, CancellationToken token = default)
+        public async Task<Subscription?> SubscribeToCoach(Guid coachId, CancellationToken token = default)
         {
             if(!IsLoggedIn)
                 throw new InvalidOperationException("No user logged in");
-            return SubscriptionManager.StartSubscribeToCoach(coachId, CurrentUser!.ObjectId, token);
-            
+            CurrentSubscription = await SubscriptionManager.StartSubscribeToCoach(coachId, CurrentUser!.ObjectId, token);
+            return CurrentSubscription;
+
         }
 
-        public Task<Subscription?> SubscribeToCourse(Guid courseId, CancellationToken token = default)
+        public async Task<Subscription?> SubscribeToCourse(Guid courseId, CancellationToken token = default)
         {
             if(!IsLoggedIn)
                 throw new InvalidOperationException("No user logged in");
-            return SubscriptionManager.StartSubscribeToCourse(courseId, CurrentUser!.ObjectId, token);
+            CurrentSubscription = await SubscriptionManager.StartSubscribeToCourse(courseId, CurrentUser!.ObjectId, token);
+            return CurrentSubscription;
+        }
+
+        public Task<bool> IsSubscribedToCoach(Guid coachId, CancellationToken token = default)
+        {
+            if (!IsLoggedIn)
+                throw new InvalidOperationException("No user logged in.");
+            return SubscriptionManager.IsSubscribedToCoach(coachId, CurrentUser!.ObjectId, token);
+        }
+
+        public Task<bool> IsSubscribedToCourse(Guid courseId, CancellationToken token = default)
+        {
+            if (!IsLoggedIn)
+                throw new InvalidOperationException("No user logged in.");
+            return SubscriptionManager.IsSubscribedToCourse(courseId, CurrentUser!.ObjectId, token);
         }
     }
 }

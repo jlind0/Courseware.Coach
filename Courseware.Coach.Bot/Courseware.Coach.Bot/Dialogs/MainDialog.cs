@@ -6,6 +6,7 @@ using Courseware.Coach.Data;
 using Courseware.Coach.Data.Core;
 using Courseware.Coach.LLM;
 using Courseware.Coach.LLM.Core;
+using Courseware.Coach.Subscriptions.Core;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Bot.Builder;
 using Microsoft.Bot.Builder.Dialogs;
@@ -70,7 +71,8 @@ namespace Courseware.Coach.Bot.Dialogs
         protected IBotFrameworkHttpAdapter Adapter { get; }
         protected IRepository<UnitOfWork, Course> CourseRepository { get; }
         // Dependency injection uses this constructor to instantiate MainDialog
-        public MainDialog(ILogger<MainDialog> logger, IConfiguration config, LLMFactory factory, IBotFrameworkHttpAdapter adapter, IRepository<UnitOfWork, CH> coachRepository, IRepository<UnitOfWork, Course> courseRepository)
+        public MainDialog(ILogger<MainDialog> logger, IConfiguration config, LLMFactory factory, 
+            IBotFrameworkHttpAdapter adapter, IRepository<UnitOfWork, CH> coachRepository, IRepository<UnitOfWork, Course> courseRepository)
             : base(nameof(MainDialog))
         { 
             Logger = logger;
@@ -136,6 +138,11 @@ namespace Courseware.Coach.Bot.Dialogs
                 StartFinishLesson,
                 RecieveFinishLesson
             };
+            var subscribeToCoach = new WaterfallStep[]
+            {
+                StartSubscriptionToCoach,
+                FinishSubscriptionToCoach
+            };
             AddDialog(new WaterfallDialog(LoginPickCoach, waterfallSteps));
             AddDialog(new WaterfallDialog(ChatWithCoach, coachSteps));
             AddDialog(new WaterfallDialog(MainMenu, mainMenuSteps));
@@ -145,6 +152,7 @@ namespace Courseware.Coach.Bot.Dialogs
             AddDialog(new WaterfallDialog(FollowPrompts, followPromptsSteps));
             AddDialog(new WaterfallDialog(ContinueLesson, continueWithLesson));
             AddDialog(new WaterfallDialog(FinishLesson, finishLesson));
+            AddDialog(new WaterfallDialog(SubscribeToCoach, subscribeToCoach));
             AddDialog(new TextPrompt(nameof(TextPrompt)));
             AddDialog(new ChoicePrompt(nameof(ChoicePrompt)));
             AddDialog(new ConfirmPrompt(nameof(ConfirmPrompt)));
@@ -160,6 +168,38 @@ namespace Courseware.Coach.Bot.Dialogs
         protected const string FollowPrompts = nameof(FollowPrompts);
         protected const string ContinueLesson = nameof(ContinueLesson);
         protected const string FinishLesson = nameof(FinishLesson);
+        protected const string SubscribeToCoach = nameof(SubscribeToCoach);
+       
+        private async Task<DialogTurnResult> StartSubscriptionToCoach(WaterfallStepContext stepContext, CancellationToken token)
+        {
+            var coachId = (Guid)stepContext.Options;
+            var LLM = Factory.GetLLM(stepContext.Context.Activity.Conversation.Id);
+            var subscription = await LLM.SubscribeToCoach(coachId, token);
+            if(subscription == null)
+            {
+                await stepContext.Context.SendActivityAsync(MessageFactory.Text("Failed to subscribe to coach."), token);
+                return await stepContext.EndDialogAsync(null, token);
+            }
+            await stepContext.Context.SendActivityAsync(MessageFactory.Text($"Please complete your [subscription]({subscription.StripeSessionUrl})"), token);
+            return await stepContext.PromptAsync(nameof(ConfirmPrompt), new PromptOptions { Prompt = MessageFactory.Text("Have you completed your subscription?") }, token);
+        }
+        private async Task<DialogTurnResult> FinishSubscriptionToCoach(WaterfallStepContext stepContext, CancellationToken token)
+        {
+            var LLM = Factory.GetLLM(stepContext.Context.Activity.Conversation.Id);
+            bool result = (bool)stepContext.Result;
+            if(LLM.CurrentSubscription?.CoachId == null)
+            {
+                await stepContext.Context.SendActivityAsync(MessageFactory.Text("No subscription found."), token);
+                return await stepContext.EndDialogAsync(null, token);
+            }
+            if (result && await LLM.IsSubscribedToCoach(LLM.CurrentSubscription.CoachId.Value, token))
+            {
+                await LLM.StartConversationWithCoach(LLM.CurrentSubscription.CoachId.Value, token);
+                return await stepContext.ReplaceDialogAsync(ChatWithCoach, null, token);
+            }
+            else
+                return await stepContext.ReplaceDialogAsync(MainMenu, null, token);
+        }
         private async Task<DialogTurnResult> StartFinishLesson(WaterfallStepContext stepContext, CancellationToken cancellationToken)
         {
             return await stepContext.PromptAsync(nameof(ConfirmPrompt), new PromptOptions { Prompt = MessageFactory.Text("You have finished the lesson, would you like to start the next one?") });
@@ -377,7 +417,7 @@ namespace Courseware.Coach.Bot.Dialogs
             }
             return await stepContext.ReplaceDialogAsync(MainMenu, null, cancellationToken);
         }
-        private async Task<DialogTurnResult> HandleCoachChoiceResultAsync(WaterfallStepContext stepContext, CancellationToken cancellationToken)
+        private async Task<DialogTurnResult>  HandleCoachChoiceResultAsync(WaterfallStepContext stepContext, CancellationToken cancellationToken)
         {
             var choice = (FoundChoice)stepContext.Result;
 
@@ -391,8 +431,14 @@ namespace Courseware.Coach.Bot.Dialogs
             if (!LLM.IsLoggedIn)
             {
                 await stepContext.Context.SendActivityAsync(MessageFactory.Text("Not logged in."), cancellationToken);
+                return await stepContext.ReplaceDialogAsync(MainMenu, null, cancellationToken);
             }
-            await LLM.StartConversationWithCoach(coaches.Items.Single().Id, cancellationToken);
+            var coach = coaches.Items.Single();
+            if (!await LLM.IsSubscribedToCoach(coach.Id, cancellationToken))
+            {
+                return await stepContext.ReplaceDialogAsync(SubscribeToCoach, coach.Id , cancellationToken);
+            }
+            await LLM.StartConversationWithCoach(coach.Id, cancellationToken);
             if (LLM.CurrentConversationId == null)
             {
                 await stepContext.Context.SendActivityAsync(MessageFactory.Text("Failed to start conversation with coach."), cancellationToken);
