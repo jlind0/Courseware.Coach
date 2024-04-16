@@ -315,7 +315,7 @@ namespace Courseware.Coach.Bot.Dialogs
             {
                 await stepContext.Context.SendActivityAsync(MessageFactory.Text("No message received."), cancellationToken);
             }
-            else
+            else if (!msg.StartsWith("/"))
             {
                 CancellationTokenSource cts = new CancellationTokenSource();
                 // Start a task that sends typing activity every few seconds
@@ -407,7 +407,7 @@ namespace Courseware.Coach.Bot.Dialogs
             {
                 return await stepContext.ReplaceDialogAsync(FollowPrompts, null, token);
             }
-            else
+            else if(!msg.StartsWith("/"))
             {
                 CancellationTokenSource cts = new CancellationTokenSource();
                 // Start a task that sends typing activity every few seconds

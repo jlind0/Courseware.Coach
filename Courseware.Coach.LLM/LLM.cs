@@ -399,17 +399,29 @@ namespace Courseware.Coach.LLM
             return user;
         }
 
-        public Task<bool> SetLocale(string locale = "en-US", CancellationToken token = default)
+        public async Task<bool> SetLocale(string locale = "en-US", CancellationToken token = default)
         {
             try
             {
+                var oldLocale = CurrentLocale;
                 CultureInfo cultureInfo = new CultureInfo(locale);
                 CurrentLocale = locale;
-                return Task.FromResult(true);
+                if (CurrentCourse != null)
+                {
+                    foreach (var lesson in CurrentCourse.Lessons)
+                    {
+                        lesson.Name = await Translation.Translate(lesson.Name, oldLocale ?? "en-US", CurrentLocale, token);
+                        foreach (var prompt in lesson.Prompts)
+                        {
+                            prompt.Text = await Translation.Translate(prompt.Text, oldLocale ?? "en-US", CurrentLocale, token);
+                        }
+                    }
+                }
+                return true;
             }
             catch
             {
-                return Task.FromResult(false);
+                return false;
             }
         }
 
