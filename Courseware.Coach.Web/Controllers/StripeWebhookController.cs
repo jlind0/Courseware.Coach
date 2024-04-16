@@ -51,33 +51,6 @@ namespace Courseware.Coach.Web.Controllers
                     else
                         throw new InvalidDataException();
                 }
-                else if(stripeEvent.Type == Events.InvoicePaymentSucceeded)
-                {
-                    var invoice = stripeEvent.Data.Object as Invoice;
-                    if (invoice == null)
-                        throw new InvalidDataException();
-                    if (invoice.Metadata.TryGetValue(nameof(Sub.Id), out var subscriptionId)
-                                               && invoice.Metadata.TryGetValue(nameof(U.ObjectId), out var objectId))
-                    {
-                        if(invoice.AmountPaid > 0)
-                            await SubscriptionManager.FinishSubscription(Guid.Parse(subscriptionId), objectId, invoice.AmountPaid / 100m);
-                    }
-                    else
-                        throw new InvalidDataException();
-                }
-                else if(stripeEvent.Type == Events.InvoicePaymentFailed)
-                {
-                    var invoice = stripeEvent.Data.Object as Invoice;
-                    if (invoice == null)
-                        throw new InvalidDataException();
-                    if (invoice.Metadata.TryGetValue(nameof(Sub.Id), out var subscriptionId)
-                                               && invoice.Metadata.TryGetValue(nameof(U.ObjectId), out var objectId))
-                    {
-                        await SubscriptionManager.CancelSubscription(Guid.Parse(subscriptionId), objectId);
-                    }
-                    else
-                        throw new InvalidDataException();
-                }
                 else if(stripeEvent.Type == Events.CustomerSubscriptionDeleted)
                 {
                     var subscription = stripeEvent.Data.Object as Subscription;

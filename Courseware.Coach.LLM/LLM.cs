@@ -233,6 +233,17 @@ namespace Courseware.Coach.LLM
             if (CurrentSubscription?.ConversationId != null)
             {
                 CurrentConversationId = CurrentSubscription.ConversationId;
+                var history = await CloneAI.GetHistory(CurrentCoach.APIKey, CurrentConversationId, token);
+                if (history != null)
+                {
+                    foreach (var msg in history.history.OrderByDescending(h => h.created_at).Take(10).OrderBy(p => p.created_at))
+                    {
+                        if (msg.sender == "USER")
+                            await PushText(new CloneResponse() { text = $"You: {msg.text}" }, CurrentCoach.NativeLocale, CurrentCoach.DefaultVoiceName, token);
+                        else
+                            await PushText(new CloneResponse() { text = $"Coach: {msg.text}" }, CurrentCoach.NativeLocale, CurrentCoach.DefaultVoiceName, token);
+                    }
+                }
             }
             if(CurrentSubscription?.CurrentLessonId != null)
             {

@@ -143,6 +143,11 @@ namespace Courseware.Coach.Bot.Dialogs
                 StartSubscriptionToCoach,
                 FinishSubscriptionToCoach
             };
+            var subscribeToCourse = new WaterfallStep[]
+            {
+                StartSubscriptionToCourse,
+                FinishSubscriptionToCourse
+            };
             AddDialog(new WaterfallDialog(LoginPickCoach, waterfallSteps));
             AddDialog(new WaterfallDialog(ChatWithCoach, coachSteps));
             AddDialog(new WaterfallDialog(MainMenu, mainMenuSteps));
@@ -153,6 +158,7 @@ namespace Courseware.Coach.Bot.Dialogs
             AddDialog(new WaterfallDialog(ContinueLesson, continueWithLesson));
             AddDialog(new WaterfallDialog(FinishLesson, finishLesson));
             AddDialog(new WaterfallDialog(SubscribeToCoach, subscribeToCoach));
+            AddDialog(new WaterfallDialog(SubscribeToCourse, subscribeToCourse));
             AddDialog(new TextPrompt(nameof(TextPrompt)));
             AddDialog(new ChoicePrompt(nameof(ChoicePrompt)));
             AddDialog(new ConfirmPrompt(nameof(ConfirmPrompt)));
@@ -169,13 +175,26 @@ namespace Courseware.Coach.Bot.Dialogs
         protected const string ContinueLesson = nameof(ContinueLesson);
         protected const string FinishLesson = nameof(FinishLesson);
         protected const string SubscribeToCoach = nameof(SubscribeToCoach);
-       
+        protected const string SubscribeToCourse = nameof(SubscribeToCourse);
         private async Task<DialogTurnResult> StartSubscriptionToCoach(WaterfallStepContext stepContext, CancellationToken token)
         {
             var coachId = (Guid)stepContext.Options;
             var LLM = Factory.GetLLM(stepContext.Context.Activity.Conversation.Id);
             var subscription = await LLM.SubscribeToCoach(coachId, token);
             if(subscription == null)
+            {
+                await stepContext.Context.SendActivityAsync(MessageFactory.Text("Failed to subscribe to coach."), token);
+                return await stepContext.EndDialogAsync(null, token);
+            }
+            await stepContext.Context.SendActivityAsync(MessageFactory.Text($"Please complete your [subscription]({subscription.StripeSessionUrl})"), token);
+            return await stepContext.PromptAsync(nameof(ConfirmPrompt), new PromptOptions { Prompt = MessageFactory.Text("Have you completed your subscription?") }, token);
+        }
+        private async Task<DialogTurnResult> StartSubscriptionToCourse(WaterfallStepContext stepContext, CancellationToken token)
+        {
+            var coachId = (Guid)stepContext.Options;
+            var LLM = Factory.GetLLM(stepContext.Context.Activity.Conversation.Id);
+            var subscription = await LLM.SubscribeToCourse(coachId, token);
+            if (subscription == null)
             {
                 await stepContext.Context.SendActivityAsync(MessageFactory.Text("Failed to subscribe to coach."), token);
                 return await stepContext.EndDialogAsync(null, token);
@@ -194,8 +213,36 @@ namespace Courseware.Coach.Bot.Dialogs
             }
             if (result && await LLM.IsSubscribedToCoach(LLM.CurrentSubscription.CoachId.Value, token))
             {
-                await LLM.StartConversationWithCoach(LLM.CurrentSubscription.CoachId.Value, token);
+                CancellationTokenSource cts = new CancellationTokenSource();
+                // Start a task that sends typing activity every few seconds
+                var typingTask = RepeatTypingIndicatorAsync(stepContext.Context, cts.Token);
+                try
+                {
+                    await LLM.StartConversationWithCoach(LLM.CurrentSubscription.CoachId.Value, token);
+                }
+                finally 
+                {
+                    cts.Cancel();
+                    await typingTask;
+                }
                 return await stepContext.ReplaceDialogAsync(ChatWithCoach, null, token);
+            }
+            else
+                return await stepContext.ReplaceDialogAsync(MainMenu, null, token);
+        }
+        private async Task<DialogTurnResult> FinishSubscriptionToCourse(WaterfallStepContext stepContext, CancellationToken token)
+        {
+            var LLM = Factory.GetLLM(stepContext.Context.Activity.Conversation.Id);
+            bool result = (bool)stepContext.Result;
+            if (LLM.CurrentSubscription?.CourseId == null)
+            {
+                await stepContext.Context.SendActivityAsync(MessageFactory.Text("No subscription found."), token);
+                return await stepContext.EndDialogAsync(null, token);
+            }
+            if (result && await LLM.IsSubscribedToCourse(LLM.CurrentSubscription.CourseId.Value, token))
+            {
+                await LLM.StartCourse(LLM.CurrentSubscription.CourseId.Value, token);
+                return await stepContext.ReplaceDialogAsync(TakeLesson, null, token);
             }
             else
                 return await stepContext.ReplaceDialogAsync(MainMenu, null, token);
@@ -226,16 +273,46 @@ namespace Courseware.Coach.Bot.Dialogs
         {
             var LLM = Factory.GetLLM(stepContext.Context.Activity.Conversation.Id);
             var msg = stepContext.Result as string;
-            if(msg == null)
+            if (msg == null)
             {
                 await stepContext.Context.SendActivityAsync(MessageFactory.Text("No message received."), cancellationToken);
             }
             else
             {
-                await LLM.ChatWithCoach(msg, cancellationToken);
+                CancellationTokenSource cts = new CancellationTokenSource();
+                // Start a task that sends typing activity every few seconds
+                var typingTask = RepeatTypingIndicatorAsync(stepContext.Context, cts.Token);
+
+                try
+                {
+                    // Perform the long-running operation
+                    await LLM.ChatWithCoach(msg, cancellationToken);
+                }
+                finally
+                {
+                    // Once the operation is complete, cancel the typing task
+                    cts.Cancel();
+                    await typingTask; // Ensure to await the typing task to handle any loose ends
+                }
             }
             return await stepContext.NextAsync(null, cancellationToken);
+        }
 
+        private async Task RepeatTypingIndicatorAsync(ITurnContext context, CancellationToken cancellationToken)
+        {
+            try
+            {
+                while (!cancellationToken.IsCancellationRequested)
+                {
+                    var typing = Activity.CreateTypingActivity();
+                    await context.SendActivityAsync(typing, cancellationToken);
+                    await Task.Delay(2000, cancellationToken); // Delay for a few seconds before sending another typing indicator
+                }
+            }
+            catch (TaskCanceledException)
+            {
+                // Ignore the cancellation exception
+            }
         }
         protected async Task<DialogTurnResult> StartLesson(WaterfallStepContext stepContext, CancellationToken token)
         {
@@ -274,7 +351,19 @@ namespace Courseware.Coach.Bot.Dialogs
             }
             else
             {
-                await LLM.SendMessageForCurrentPrompt(msg, token);
+                CancellationTokenSource cts = new CancellationTokenSource();
+                // Start a task that sends typing activity every few seconds
+                var typingTask = RepeatTypingIndicatorAsync(stepContext.Context, cts.Token);
+                try
+                {
+                    await LLM.SendMessageForCurrentPrompt(msg, token);
+                }
+                finally
+                {
+                    // Once the operation is complete, cancel the typing task
+                    cts.Cancel();
+                    await typingTask; // Ensure to await the typing task to handle any loose ends
+                }
             }
             return await stepContext.ReplaceDialogAsync(ContinueLesson, null, token);
         }
@@ -438,7 +527,18 @@ namespace Courseware.Coach.Bot.Dialogs
             {
                 return await stepContext.ReplaceDialogAsync(SubscribeToCoach, coach.Id , cancellationToken);
             }
-            await LLM.StartConversationWithCoach(coach.Id, cancellationToken);
+            CancellationTokenSource cts = new CancellationTokenSource();
+            // Start a task that sends typing activity every few seconds
+            var typingTask = RepeatTypingIndicatorAsync(stepContext.Context, cts.Token);
+            try
+            {
+                await LLM.StartConversationWithCoach(coach.Id, cancellationToken);
+            }
+            finally
+            {
+                cts.Cancel();
+                await typingTask;
+            }
             if (LLM.CurrentConversationId == null)
             {
                 await stepContext.Context.SendActivityAsync(MessageFactory.Text("Failed to start conversation with coach."), cancellationToken);
@@ -462,7 +562,23 @@ namespace Courseware.Coach.Bot.Dialogs
             {
                 await stepContext.Context.SendActivityAsync(MessageFactory.Text("Not logged in."), cancellationToken);
             }
-            await LLM.StartCourse(coaches.Items.Single().Id, cancellationToken);
+            var coach = coaches.Items.Single();
+            if (!await LLM.IsSubscribedToCourse(coach.Id, cancellationToken))
+            {
+                return await stepContext.ReplaceDialogAsync(SubscribeToCourse, coach.Id, cancellationToken);
+            }
+            CancellationTokenSource cts = new CancellationTokenSource();
+            // Start a task that sends typing activity every few seconds
+            var typingTask = RepeatTypingIndicatorAsync(stepContext.Context, cts.Token);
+            try
+            {
+                await LLM.StartCourse(coach.Id, cancellationToken);
+            }
+            finally
+            {
+                cts.Cancel();
+                await typingTask;
+            }
             if (LLM.CurrentConversationId == null)
             {
                 await stepContext.Context.SendActivityAsync(MessageFactory.Text("Failed to start conversation with coach."), cancellationToken);
@@ -477,19 +593,30 @@ namespace Courseware.Coach.Bot.Dialogs
             var result = stepContext.Result as TokenResponse;
             if (result != null)
             {
-                var userId = await GetUserId(result.Token);
-                if (userId != null)
+                CancellationTokenSource cts = new CancellationTokenSource();
+                // Start a task that sends typing activity every few seconds
+                var typingTask = RepeatTypingIndicatorAsync(stepContext.Context, cts.Token);
+                try
                 {
-                    var user = await LLM.Login(userId, cancellationToken);
-                    if (user == null)
+                    var userId = await GetUserId(result.Token);
+                    if (userId != null)
                     {
-                        await stepContext.Context.SendActivityAsync(MessageFactory.Text("Login failed. Please try again."), cancellationToken);
-                        return await stepContext.EndDialogAsync(null, cancellationToken);
+                        var user = await LLM.Login(userId, cancellationToken);
+                        if (user == null)
+                        {
+                            await stepContext.Context.SendActivityAsync(MessageFactory.Text("Login failed. Please try again."), cancellationToken);
+                            return await stepContext.EndDialogAsync(null, cancellationToken);
+                        }
+                        await stepContext.Context.SendActivityAsync(MessageFactory.Text($"Welcome {user.FirstName}!"), cancellationToken);
                     }
-                    await stepContext.Context.SendActivityAsync(MessageFactory.Text($"Welcome {user.FirstName}!"), cancellationToken);
+                    // User is authenticated
+                    return await stepContext.ReplaceDialogAsync(MainMenu, null, cancellationToken);
                 }
-                // User is authenticated
-                return await stepContext.ReplaceDialogAsync(MainMenu, null, cancellationToken);
+                finally
+                {
+                    cts.Cancel();
+                    await typingTask;
+                }
             }
 
             // Authentication failed
