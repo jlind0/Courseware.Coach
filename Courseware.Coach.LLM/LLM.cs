@@ -505,7 +505,7 @@ namespace Courseware.Coach.LLM
         {
             if (CurrentUser == null)
                 return null;
-            return $"I am {CurrentUser.FirstName} {CurrentUser.LastName} who lives in {CurrentUser.Country ?? ""} with bio: {CurrentUser.Bio ?? ""}";
+            return $"I am {CurrentUser.FirstName ?? ""} {CurrentUser.LastName ?? ""} who lives in {CurrentUser.Country ?? ""} with bio: {CurrentUser.Bio ?? ""}";
 
         }
         public async Task<CoachInstance?> StartConversationWithCoachInstance(Guid coachId, CancellationToken token = default)

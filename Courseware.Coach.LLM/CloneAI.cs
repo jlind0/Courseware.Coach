@@ -119,7 +119,7 @@ namespace Courseware.Coach.LLM
         public async Task UploadUserInfo(string apiKey, string email, string slug, string? info = null, CancellationToken token = default)
         {
             string route = "/clone/user_info";
-            if (info == null)
+            if (string.IsNullOrWhiteSpace(info))
                 return;
             if (info != null)
             {
@@ -133,6 +133,7 @@ namespace Courseware.Coach.LLM
                 info = info
             };
             var requestBody = JsonConvert.SerializeObject(body);
+            Logger.LogInformation(requestBody);
             using (var client = new HttpClient())
             using (var request = new HttpRequestMessage())
             {
