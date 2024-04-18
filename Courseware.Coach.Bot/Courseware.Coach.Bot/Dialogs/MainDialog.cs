@@ -26,9 +26,11 @@ using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
 using System.Net.Http;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
+using static System.Net.Mime.MediaTypeNames;
 using CH = Courseware.Coach.Core.Coach;
 
 namespace Courseware.Coach.Bot.Dialogs
@@ -68,7 +70,7 @@ namespace Courseware.Coach.Bot.Dialogs
         protected string MetadataUrl { get; }
         protected string IssuerUrl { get; }
         protected LLMFactory Factory { get; }
-        protected IBotFrameworkHttpAdapter Adapter { get; }
+        protected AdapterWithErrorHandler Adapter { get; }
         protected IRepository<UnitOfWork, Course> CourseRepository { get; }
         // Dependency injection uses this constructor to instantiate MainDialog
         public MainDialog(ILogger<MainDialog> logger, IConfiguration config, LLMFactory factory, 
@@ -82,7 +84,7 @@ namespace Courseware.Coach.Bot.Dialogs
             IssuerUrl = config["Security:Issuer"];
             Factory = factory;
             CoachRepository = coachRepository;
-            Adapter = adapter;
+            Adapter = (AdapterWithErrorHandler)adapter;
             ConnectionName = config["ConnectionName"];
             
             AddDialog(new OAuthPrompt(
@@ -317,21 +319,23 @@ namespace Courseware.Coach.Bot.Dialogs
             }
             else if (!msg.StartsWith("/"))
             {
-                CancellationTokenSource cts = new CancellationTokenSource();
-                // Start a task that sends typing activity every few seconds
-                var typingTask = RepeatTypingIndicatorAsync(stepContext.Context, cts.Token);
+                _ = Task.Factory.StartNew(async () =>
+                {
+                    CancellationTokenSource cts = new CancellationTokenSource();
+                    // Start a task that sends typing activity every few seconds
+                    RepeatTypingIndicatorAsync(stepContext.Context.Activity.GetConversationReference(), cts.Token);
 
-                try
-                {
-                    // Perform the long-running operation
-                    await LLM.ChatWithCoach(msg, cancellationToken);
-                }
-                finally
-                {
-                    // Once the operation is complete, cancel the typing task
-                    cts.Cancel();
-                    await typingTask; // Ensure to await the typing task to handle any loose ends
-                }
+                    try
+                    {
+                        // Perform the long-running operation
+                        await LLM.ChatWithCoach(msg, cancellationToken);
+                    }
+                    finally
+                    {
+                        // Once the operation is complete, cancel the typing task
+                        cts.Cancel();
+                    }
+                });
             }
             return await stepContext.NextAsync(null, cancellationToken);
         }
@@ -351,6 +355,22 @@ namespace Courseware.Coach.Bot.Dialogs
             {
                 // Ignore the cancellation exception
             }
+        }
+        private void RepeatTypingIndicatorAsync(ConversationReference convRef, CancellationToken cancellationToken)
+        {
+            _ = Adapter.ContinueConversationAsync("7a754f6d-f4ef-43be-8cef-70971fbbc055", convRef, async (turnContext, token) =>
+            {
+                try
+                {
+                    while (!cancellationToken.IsCancellationRequested)
+                    {
+                        var typing = Activity.CreateTypingActivity();
+                        await turnContext.SendActivityAsync(typing, token);
+                        await Task.Delay(2000, cancellationToken); // Delay for a few seconds before sending another typing indicator
+                    }
+                }
+                catch (TaskCanceledException){ }
+            }, cancellationToken);
         }
         protected async Task<DialogTurnResult> StartLesson(WaterfallStepContext stepContext, CancellationToken token)
         {
@@ -374,19 +394,21 @@ namespace Courseware.Coach.Bot.Dialogs
             }
             if (prompt.Type == PromptTypes.Lecture)
             {
-                CancellationTokenSource cts = new CancellationTokenSource();
-                // Start a task that sends typing activity every few seconds
-                var typingTask = RepeatTypingIndicatorAsync(stepContext.Context, cts.Token);
-                try
+                _ = Task.Factory.StartNew(async () =>
                 {
-                    await LLM.SendMessageForCurrentPrompt("", token);
-                }
-                finally
-                {
-                    // Once the operation is complete, cancel the typing task
-                    cts.Cancel();
-                    await typingTask; // Ensure to await the typing task to handle any loose ends
-                }
+                    CancellationTokenSource cts = new CancellationTokenSource();
+                    // Start a task that sends typing activity every few seconds
+                    RepeatTypingIndicatorAsync(stepContext.Context.Activity.GetConversationReference(), cts.Token);
+                    try
+                    {
+                        await LLM.SendMessageForCurrentPrompt("", token);
+                    }
+                    finally
+                    {
+                        // Once the operation is complete, cancel the typing task
+                        cts.Cancel();
+                    }
+                });
                 return await stepContext.ReplaceDialogAsync(ContinueLesson, null, token);
             }
             else
@@ -409,19 +431,21 @@ namespace Courseware.Coach.Bot.Dialogs
             }
             else if(!msg.StartsWith("/"))
             {
-                CancellationTokenSource cts = new CancellationTokenSource();
-                // Start a task that sends typing activity every few seconds
-                var typingTask = RepeatTypingIndicatorAsync(stepContext.Context, cts.Token);
-                try
+                _ = Task.Factory.StartNew(async () =>
                 {
-                    await LLM.SendMessageForCurrentPrompt(msg, token);
-                }
-                finally
-                {
-                    // Once the operation is complete, cancel the typing task
-                    cts.Cancel();
-                    await typingTask; // Ensure to await the typing task to handle any loose ends
-                }
+                    CancellationTokenSource cts = new CancellationTokenSource();
+                    // Start a task that sends typing activity every few seconds
+                    RepeatTypingIndicatorAsync(stepContext.Context.Activity.GetConversationReference(), cts.Token);
+                    try
+                    {
+                        await LLM.SendMessageForCurrentPrompt(msg, token);
+                    }
+                    finally
+                    {
+                        // Once the operation is complete, cancel the typing task
+                        cts.Cancel();
+                    }
+                });
             }
             return await stepContext.ReplaceDialogAsync(ContinueLesson, null, token);
         }
@@ -496,6 +520,8 @@ namespace Courseware.Coach.Bot.Dialogs
                 Logger.LogInformation(response.text);
                 try
                 {
+                    string pattern = @"\[[^\]]*\]";
+                    response.text = Regex.Replace(response.text, pattern, string.Empty);
                     await adapter.ContinueConversationAsync("7a754f6d-f4ef-43be-8cef-70971fbbc055", ConvRef, async (turnContext, token) =>
                     {
                         await turnContext.SendActivityAsync(MessageFactory.Text(response.text), token);
