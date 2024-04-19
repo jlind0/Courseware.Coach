@@ -68,6 +68,7 @@ namespace Courseware.Coach.Bot
             services.AddSingleton<ICloneAI, CloneAI>();
             services.AddSingleton<ITTS, TTS>();
             services.AddSingleton<ITranslationService, TranslationService>();
+            services.AddSingleton<IChatGPT, ChatGPT>();
             services.AddTransient<ILLM, LLM.LLM>();
             services.AddSingleton<LLMFactory>();
             // Create the User state. (Used in this bot's Dialog implementation.)

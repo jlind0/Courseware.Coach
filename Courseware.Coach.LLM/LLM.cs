@@ -116,9 +116,10 @@ namespace Courseware.Coach.LLM
             protected set => this.RaiseAndSetIfChanged(ref currentLocale, value);
         }   
         protected bool IsVoiceEnabled { get; }
+        protected IChatGPT ChatGPT { get; }
         public LLM(ICloneAI cloneAI, ITTS tts, ITranslationService translation, ISubscriptionManager subscriptionManager,
             IRepository<UnitOfWork, User> userRepo, IRepository<UnitOfWork, CH> coachRepo, 
-            IRepository<UnitOfWork, Course> courseRepo, IConfiguration config, ILogger<LLM> logger)
+            IRepository<UnitOfWork, Course> courseRepo, IConfiguration config, ILogger<LLM> logger, IChatGPT chatGPT)
         {
             IsVoiceEnabled = bool.Parse(config["LLM:VoiceEnabled"] ?? "false");
             Logger = logger;
@@ -131,9 +132,10 @@ namespace Courseware.Coach.LLM
             CourseRepo = courseRepo;
             BrodcastConversation = new BroadcastBlock<CloneResponse>(null);
             BrodcastAudioConversation = new BroadcastBlock<byte[]>(null);
+            ChatGPT = chatGPT;
         }
 
-        public async Task ChatWithCoach(string message, CancellationToken token = default)
+        public async Task ChatWithCoach(string message, string? locale = null, CancellationToken token = default)
         {
             if (CurrentCoach == null)
                 throw new InvalidOperationException("No coach or conversation started");
@@ -143,7 +145,7 @@ namespace Courseware.Coach.LLM
                 throw new InvalidOperationException("No conversation started");
             Logger.LogInformation($"Current Conversation Id : {CurrentConversationId}");
             string effectiveLocale = CurrentLocale ?? CurrentSubscription?.Locale ?? CurrentUser?.Locale ?? "en-US";
-            if (effectiveLocale != CurrentCoach.NativeLocale)
+            if (effectiveLocale != (locale ?? CurrentCoach.NativeLocale))
             {
                 message = await Translation.Translate(message, effectiveLocale, CurrentCoach.NativeLocale, token);
             }
@@ -187,7 +189,7 @@ namespace Courseware.Coach.LLM
             DefaultVoice.AddOrUpdate(locale, voiceName, (k, v) => voiceName);
             return voiceName;
         }
-        public async Task ChatWithCoachInstance(string message, CancellationToken token = default)
+        public async Task ChatWithCoachInstance(string message, string? locale = null, CancellationToken token = default)
         {
             if (CurrentCoach == null)
                 throw new InvalidOperationException("No coach or conversation started");
@@ -198,7 +200,7 @@ namespace Courseware.Coach.LLM
             if (CurrentConversationId == null)
                 throw new InvalidOperationException("No conversation started");
             string effectiveLocale = CurrentLocale ?? CurrentSubscription?.Locale ?? CurrentUser?.Locale ?? "en-US";
-            if(effectiveLocale != CurrentCoach.NativeLocale)
+            if(effectiveLocale != (locale ?? CurrentCoach.NativeLocale))
             {
                 message = await Translation.Translate(message, effectiveLocale, CurrentCoach.NativeLocale, token);
             }
@@ -245,17 +247,21 @@ namespace Courseware.Coach.LLM
             if (CurrentSubscription?.ConversationId != null)
             {
                 CurrentConversationId = CurrentSubscription.ConversationId;
-                var history = await CloneAI.GetHistory(CurrentCoach.APIKey, CurrentConversationId, token);
-                if (history != null)
+                try
                 {
-                    foreach (var msg in history.history.OrderByDescending(h => h.created_at).Take(10).OrderBy(p => p.created_at))
+                    var history = await CloneAI.GetHistory(CurrentCoach.APIKey, CurrentConversationId, token);
+                    if (history != null)
                     {
-                        if (msg.sender == "USER")
-                            await PushText(new CloneResponse() { text = $"You: {msg.text}" }, CurrentCoach.NativeLocale, CurrentCoach.DefaultVoiceName, token);
-                        else
-                            await PushText(new CloneResponse() { text = $"Coach: {msg.text}" }, CurrentCoach.NativeLocale, CurrentCoach.DefaultVoiceName, token);
+                        foreach (var msg in history.history.OrderByDescending(h => h.created_at).Take(10).OrderBy(p => p.created_at))
+                        {
+                            if (msg.sender == "USER")
+                                await PushText(new CloneResponse() { text = $"You: {msg.text}" }, CurrentCoach.NativeLocale, CurrentCoach.DefaultVoiceName, token);
+                            else
+                                await PushText(new CloneResponse() { text = $"Coach: {msg.text}" }, CurrentCoach.NativeLocale, CurrentCoach.DefaultVoiceName, token);
+                        }
                     }
                 }
+                catch { }
             }
             if(CurrentSubscription?.CurrentLessonId != null)
             {
@@ -353,9 +359,9 @@ namespace Courseware.Coach.LLM
                 throw new InvalidOperationException("No coach started");
             message = $"{CurrentPrompt.Text} {message}";
             if (CurrentCoachInstance == null)
-                await ChatWithCoach(message, token);
+                await ChatWithCoach(message, token: token);
             else
-                await ChatWithCoachInstance(message, token);
+                await ChatWithCoachInstance(message, token: token);
         }
         public async ValueTask DisposeAsync()
         {
@@ -461,9 +467,10 @@ namespace Courseware.Coach.LLM
                 CurrentSubscription = await SubscriptionManager.GetCurrentSubscriptionForCoach(coachId, CurrentUser.ObjectId, token);
                 if (!await SubscriptionManager.IsSubscribedToCoach(coachId, CurrentUser.ObjectId, token))
                     return null;
-                await CloneAI.UploadUserInfo(CurrentCoach.APIKey, CurrentUser.Email, CurrentCoach.Slug, GetUserInfo(), token: token);
+                
                 if(CurrentSubscription?.ConversationId != null)
                 {
+                    await CloneAI.UploadUserInfo(CurrentCoach.APIKey, CurrentUser.Email, CurrentCoach.Slug, GetUserInfo(), token: token);
                     CurrentConversationId = CurrentSubscription.ConversationId;
                     var history = await CloneAI.GetHistory(CurrentCoach.APIKey, CurrentConversationId, token);
                     if (history != null)
@@ -479,6 +486,7 @@ namespace Courseware.Coach.LLM
                     return CurrentCoach;
                 }
                 var resp = await CloneAI.StartConversation(CurrentCoach.APIKey, CurrentCoach.Slug, email: CurrentUser?.Email, token: token);
+                await CloneAI.UploadUserInfo(CurrentCoach.APIKey, CurrentUser!.Email, CurrentCoach.Slug, GetUserInfo(), token: token);
                 Logger.LogInformation("Conversation started");
                 if (resp != null)
                 {
@@ -604,6 +612,32 @@ namespace Courseware.Coach.LLM
                 return option.IsCorrect;
             }
             return false;
+        }
+
+        public Task<bool> Logout(CancellationToken token = default)
+        {
+            Reset();
+            CurrentUser = null;
+            return Task.FromResult(true);
+        }
+
+        public async Task SuggestNewTopic(CancellationToken token = default)
+        {
+            if (CurrentCoach == null)
+                return;
+            if(!string.IsNullOrWhiteSpace(CurrentCoach.TopicSystemPrompt) && !string.IsNullOrWhiteSpace(CurrentCoach.TopicUserPrompt))
+            {
+                var topic = await ChatGPT.GetRepsonse(CurrentCoach.TopicSystemPrompt, CurrentCoach.TopicUserPrompt, token);
+                if(!string.IsNullOrWhiteSpace(topic))
+                {
+
+                    await PushText(new CloneResponse() { text = topic }, "en-US", CurrentCoach.DefaultVoiceName, token);
+                    if(CurrentCoachInstance != null)
+                        await ChatWithCoachInstance(topic, "en-US", token);
+                    else
+                        await ChatWithCoach(topic, "en-US", token);
+                }
+            }
         }
     }
 }

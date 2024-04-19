@@ -38,8 +38,8 @@ namespace Courseware.Coach.LLM.Core
         Task<CoachInstance?> StartConversationWithCoachInstance(Guid coachId, CancellationToken token = default);
         Task<Subscription?> SubscribeToCoach(Guid coachId, CancellationToken token = default);
         Task<Subscription?> SubscribeToCourse(Guid courseId, CancellationToken token = default);
-        Task ChatWithCoach(string message, CancellationToken token = default);
-        Task ChatWithCoachInstance(string message, CancellationToken token = default);
+        Task ChatWithCoach(string message, string? locale = null, CancellationToken token = default);
+        Task ChatWithCoachInstance(string message, string? locale = null, CancellationToken token = default);
         Task EndConversation(CancellationToken token = default);
         Task<Lesson?> GetNextLesson();
         Prompt? GetNextPrompt();
@@ -49,6 +49,8 @@ namespace Courseware.Coach.LLM.Core
         Task SendMessageForCurrentPrompt(string message, CancellationToken token = default);
         Task<bool> IsSubscribedToCoach(Guid coachId, CancellationToken token = default);
         Task<bool> IsSubscribedToCourse(Guid courseId, CancellationToken token = default);
+        Task<bool> Logout(CancellationToken token = default);
+        Task SuggestNewTopic(CancellationToken token = default);
     }
     
 }

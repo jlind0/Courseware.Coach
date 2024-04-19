@@ -328,7 +328,7 @@ namespace Courseware.Coach.Bot.Dialogs
                     try
                     {
                         // Perform the long-running operation
-                        await LLM.ChatWithCoach(msg, cancellationToken);
+                        await LLM.ChatWithCoach(msg, token: cancellationToken);
                     }
                     finally
                     {
@@ -481,12 +481,14 @@ namespace Courseware.Coach.Bot.Dialogs
 
         private async Task<DialogTurnResult> InterruptAsync(DialogContext innerDc, CancellationToken cancellationToken = default(CancellationToken))
         {
+            var LLM = Factory.GetLLM(innerDc.Context.Activity.Conversation.Id);
             if (innerDc.Context.Activity.Type == ActivityTypes.Message)
             {
                 var text = innerDc.Context.Activity.Text.ToLowerInvariant();
 
                 if (text == "/logout")
                 {
+                    await LLM.Logout(cancellationToken);
                     // The UserTokenClient encapsulates the authentication processes.
                     var userTokenClient = innerDc.Context.TurnState.Get<UserTokenClient>();
                     await userTokenClient.SignOutUserAsync(innerDc.Context.Activity.From.Id, ConnectionName, innerDc.Context.Activity.ChannelId, cancellationToken).ConfigureAwait(false);
@@ -494,15 +496,34 @@ namespace Courseware.Coach.Bot.Dialogs
                     await innerDc.Context.SendActivityAsync(MessageFactory.Text("You have been signed out."), cancellationToken);
                     return await innerDc.CancelAllDialogsAsync(cancellationToken);
                 }
-                else if(text == "/main")
+                else if (text == "/main")
                 {
                     return await innerDc.ReplaceDialogAsync(MainMenu, null, cancellationToken);
                 }
                 else if (text.StartsWith("/lang"))
                 {
                     text = text.Replace("/lang", "").Trim();
-                    var LLM = Factory.GetLLM(innerDc.Context.Activity.Conversation.Id);
+
                     await LLM.SetLocale(text, cancellationToken);
+                    await innerDc.Context.SendActivityAsync(MessageFactory.Text($"Language set to {text}"), cancellationToken);
+                }
+                else if (text == "/topic")
+                {
+                    _ = Task.Factory.StartNew(async () =>
+                    {
+                        CancellationTokenSource cts = new CancellationTokenSource();
+                        // Start a task that sends typing activity every few seconds
+                        RepeatTypingIndicatorAsync(innerDc.Context.Activity.GetConversationReference(), cts.Token);
+                        try
+                        {
+                            await LLM.SuggestNewTopic(cancellationToken);
+                        }
+                        finally
+                        {
+                            // Once the operation is complete, cancel the typing task
+                            cts.Cancel();
+                        }
+                    });
                 }
             }
 
@@ -522,6 +543,7 @@ namespace Courseware.Coach.Bot.Dialogs
                 {
                     string pattern = @"\[[^\]]*\]";
                     response.text = Regex.Replace(response.text, pattern, string.Empty);
+                    response.text = response.text.Replace("\n\n", "\n\u200B\n\n\u200B\n\n\u200B\n");
                     await adapter.ContinueConversationAsync("7a754f6d-f4ef-43be-8cef-70971fbbc055", ConvRef, async (turnContext, token) =>
                     {
                         await turnContext.SendActivityAsync(MessageFactory.Text(response.text), token);
@@ -610,7 +632,7 @@ namespace Courseware.Coach.Bot.Dialogs
             if (!LLM.IsLoggedIn)
             {
                 await stepContext.Context.SendActivityAsync(MessageFactory.Text("Not logged in."), cancellationToken);
-                return await stepContext.ReplaceDialogAsync(MainMenu, null, cancellationToken);
+                return await stepContext.EndDialogAsync(null, cancellationToken);
             }
             var coach = coaches.Items.Single();
             if (!await LLM.IsSubscribedToCoach(coach.Id, cancellationToken))
@@ -651,6 +673,7 @@ namespace Courseware.Coach.Bot.Dialogs
             if (!LLM.IsLoggedIn)
             {
                 await stepContext.Context.SendActivityAsync(MessageFactory.Text("Not logged in."), cancellationToken);
+                return await stepContext.EndDialogAsync(null, cancellationToken);
             }
             var coach = coaches.Items.Single();
             if (!await LLM.IsSubscribedToCourse(coach.Id, cancellationToken))
