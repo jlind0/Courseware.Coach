@@ -1,0 +1,126 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+  "parameters": {
+    "botServices_courseware_coach_name": {
+      "defaultValue": "courseware-coach",
+      "type": "String"
+    },
+    "userAssignedIdentities_courseware_coach_externalid": {
+      "defaultValue": "/subscriptions/a13458f4-4794-420a-8c6f-991cd3965346/resourceGroups/courseware-coach/providers/Microsoft.ManagedIdentity/userAssignedIdentities/courseware-coach",
+      "type": "String"
+    },
+    "botType": {
+      "defaultValue": "courseware-coach",
+      "type": "String"
+    },
+    "subject": {
+      "defaultValue": "courseware-coach",
+      "type": "String"
+    },
+    "appId": {
+      "defaultValue": "courseware-coach",
+      "type": "String"
+    },
+    "clientSecret": {
+      "defaultValue": "courseware-coach",
+      "type": "String"
+    }
+  },
+    "variables": {},
+    "resources": [
+        {
+            "type": "Microsoft.BotService/botServices",
+            "apiVersion": "2023-09-15-preview",
+            "name": "[parameters('botServices_courseware_coach_name')]",
+            "location": "global",
+            "sku": {
+                "name": "S1"
+            },
+            "kind": "azurebot",
+          "properties": {
+            "displayName": "[parameters('botServices_courseware_coach_name')]",
+            "iconUrl": "https://docs.botframework.com/static/devportal/client/images/bot-framework-default.png",
+            "endpoint": "[concat('https://coursewarecoachbot.azurewebsites.net/api/messages?botType=', parameters('botType'), '&subject=', parameters('subject'))]",
+            "msaAppId": "[parameters('appId')]",
+            "msaAppTenantId": "88c25c7a-38aa-45d5-bd8d-e939dd68c4f2",
+            "msaAppType": "UserAssignedMSI",
+            "msaAppMSIResourceId": "[parameters('userAssignedIdentities_courseware_coach_externalid')]",
+            "luisAppIds": [],
+            "isStreamingSupported": true,
+            "schemaTransformationVersion": "1.3",
+            "tenantId": "88c25c7a-38aa-45d5-bd8d-e939dd68c4f2",
+            "isCmekEnabled": false,
+            "disableLocalAuth": false
+          }
+        },
+        {
+            "type": "Microsoft.BotService/botServices/channels",
+            "apiVersion": "2023-09-15-preview",
+            "name": "[concat(parameters('botServices_courseware_coach_name'), '/DirectLineChannel')]",
+            "location": "global",
+            "dependsOn": [
+                "[resourceId('Microsoft.BotService/botServices', parameters('botServices_courseware_coach_name'))]"
+            ],
+            "properties": {
+                "properties": {
+                    "sites": [
+                        {
+                            "siteName": "Default Site",
+                            "isEnabled": true,
+                            "isV1Enabled": true,
+                            "isV3Enabled": true,
+                            "isSecureSiteEnabled": false,
+                            "isBlockUserUploadEnabled": false
+                        }
+                    ],
+                    "extensionKey1": "hbICYHvpMFw.bwCvSl9fiWBecIvmBDoYMaLKcA0vgOwg_S00vaPrVu8",
+                    "extensionKey2": "hbICYHvpMFw.dXQW4hZrjdzDxN0jLGIoQUcLSahT4hy1lrKlrH8mkrU"
+                },
+                "etag": "W/\"2bb7433d23b1380c59ffbc6041efaf274/22/2024 9:34:35 AM\"",
+                "channelName": "DirectLineChannel",
+                "location": "global"
+            }
+        },
+        {
+            "type": "Microsoft.BotService/botServices/channels",
+            "apiVersion": "2023-09-15-preview",
+            "name": "[concat(parameters('botServices_courseware_coach_name'), '/WebChatChannel')]",
+            "location": "global",
+            "dependsOn": [
+                "[resourceId('Microsoft.BotService/botServices', parameters('botServices_courseware_coach_name'))]"
+            ],
+            "properties": {
+                "properties": {
+                    "sites": [
+                        {
+                            "siteName": "Default Site",
+                            "isEnabled": true,
+                            "isWebchatPreviewEnabled": true,
+                            "isBlockUserUploadEnabled": false
+                        }
+                    ]
+                },
+                "etag": "W/\"28160aeb414ff237c2653db978c8d58f4/22/2024 9:34:35 AM\"",
+                "channelName": "WebChatChannel",
+                "location": "global"
+            }
+        },
+        {
+            "type": "Microsoft.BotService/botServices/connections",
+            "apiVersion": "2023-09-15-preview",
+            "name": "[concat(parameters('botServices_courseware_coach_name'), '/Azure AD B2C')]",
+            "location": "global",
+            "dependsOn": [
+                "[resourceId('Microsoft.BotService/botServices', parameters('botServices_courseware_coach_name'))]"
+            ],
+          "properties": {
+            "serviceProviderDisplayName": "Azure Active Directory B2C",
+            "id": "d86f045f-7ae7-8207-ddae-725dd8c2c35c_b7f05545-56ce-6cd4-e15a",
+            "name": "Azure AD B2C",
+            "clientId": "4a456ce3-bae5-4911-8042-4a17632644d1",
+            "clientSecret": "[parameters('clientSecret')]"
+          }
+        }
+    ]
+}

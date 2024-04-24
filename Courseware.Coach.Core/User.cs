@@ -88,7 +88,9 @@ namespace Courseware.Coach.Core
         public string? BannerImageId { get; set; }
         public List<PayoutAccount> PayoutAccounts { get; set; } = [];
         public string? TopicSystemPrompt { get; set; }
-        public string? TopicUserPrompt { get; set; }    
+        public string? TopicUserPrompt { get; set; }
+        public string? BotFrameworkName { get; set; }
+        public bool? IsBotDeployed { get; set; }
     }
     public class PayoutAccount
     {
@@ -143,6 +145,8 @@ namespace Courseware.Coach.Core
         public bool? IsPublished { get; set; } = false;
         public string? ThumbnailImageId { get; set; }
         public string? BannerImageId { get; set; }
+        public string? BotFrameworkName { get; set; }
+        public bool? IsBotDeployed { get; set; }
     }
     public class Lesson
     {

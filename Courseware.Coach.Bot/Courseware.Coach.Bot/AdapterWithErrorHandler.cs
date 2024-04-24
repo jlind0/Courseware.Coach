@@ -12,6 +12,8 @@ namespace Courseware.Coach.Bot
 {
     public class AdapterWithErrorHandler : CloudAdapter
     {
+        public string? BotType { get; set; }
+        public string? Subject { get; set; }
         public AdapterWithErrorHandler(BotFrameworkAuthentication auth, ILogger<IBotFrameworkHttpAdapter> logger, ConversationState conversationState = default)
             : base(auth, logger)
         {

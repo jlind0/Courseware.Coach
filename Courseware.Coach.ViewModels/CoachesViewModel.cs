@@ -1,4 +1,5 @@
-﻿using Courseware.Coach.Business.Core;
+﻿using Courseware.Coach.Azure.Management.Core;
+using Courseware.Coach.Business.Core;
 using Courseware.Coach.Core;
 using Courseware.Coach.Data;
 using Courseware.Coach.Data.Core;
@@ -85,10 +86,12 @@ namespace Courseware.Coach.ViewModels
         public ReactiveCommand<Guid, Unit> Load { get; }    
         protected ITTS TTS { get; }
         protected IStorageBlob Storage { get; }
-        public CoachLoaderViewModel(IBusinessRepositoryFacade<CH, UnitOfWork> coachRepository, IStorageBlob storage, ITTS tts, ILogger<CoachLoaderViewModel> logger)
+        protected IBotFrameworkDeployer Deployer { get; }
+        public CoachLoaderViewModel(IBusinessRepositoryFacade<CH, UnitOfWork> coachRepository, IStorageBlob storage, ITTS tts, ILogger<CoachLoaderViewModel> logger, IBotFrameworkDeployer deployer)
         {
             CoachRepository = coachRepository;
             Storage = storage;
+            Deployer = deployer;
             TTS = tts;
             Logger = logger;
             Load = ReactiveCommand.CreateFromTask<Guid>(DoLoad);
@@ -98,7 +101,7 @@ namespace Courseware.Coach.ViewModels
             try
             {
                 var coach = await CoachRepository.Get(id, token: token);
-                ViewModel = new CoachViewModel(id, Storage, CoachRepository, TTS, Logger);
+                ViewModel = new CoachViewModel(id, Storage, CoachRepository, TTS, Logger, Deployer);
                 await ViewModel.Load.Execute().GetAwaiter();
             }
             catch (Exception ex)
@@ -132,6 +135,7 @@ namespace Courseware.Coach.ViewModels
         public ReactiveCommand<Unit, Unit> Save { get; }
         public ReactiveCommand<CoachInstance, Unit> AddInstance { get; }
         public ReactiveCommand<Guid, Unit> RemoveInstance { get; }
+        public ReactiveCommand<Unit, Unit> DeployBot { get; }
         public AddCoachInstanceViewModel AddInstanceViewModel { get; }
         public Action Reload { get; set; } = null!;
         public string? SelectedLocale
@@ -164,7 +168,8 @@ namespace Courseware.Coach.ViewModels
         protected IStorageBlob Storage { get; }
         public ReactiveCommand<byte[], Unit> UploadThumbnail { get; }
         public ReactiveCommand<byte[], Unit> UploadBanner { get; }
-        public CoachViewModel(Guid id, IStorageBlob storage, IBusinessRepositoryFacade<CH, UnitOfWork> coachRepository, ITTS tts, ILogger logger)
+        protected IBotFrameworkDeployer Deployer { get; }
+        public CoachViewModel(Guid id, IStorageBlob storage, IBusinessRepositoryFacade<CH, UnitOfWork> coachRepository, ITTS tts, ILogger logger, IBotFrameworkDeployer deployer)
         {
             Id = id;
             CoachRepository = coachRepository;
@@ -172,6 +177,8 @@ namespace Courseware.Coach.ViewModels
             TTS = tts;
             Logger = logger;
             AddInstanceViewModel = new AddCoachInstanceViewModel(this, tts, logger);
+            Deployer = deployer;
+            DeployBot = ReactiveCommand.CreateFromTask(DoBotDeploy);
             Load = ReactiveCommand.CreateFromTask(DoLoad);
             Save = ReactiveCommand.CreateFromTask(DoSave);
             AddInstance = ReactiveCommand.CreateFromTask<CoachInstance>(DoAddInstance);
@@ -195,6 +202,25 @@ namespace Courseware.Coach.ViewModels
                         await Alert.Handle(ex.Message).GetAwaiter();
                     }
                 }).DisposeWith(disposables);
+        }
+        protected async Task DoBotDeploy(CancellationToken token = default)
+        {
+            try
+            {
+                if (Data == null || Data.IsBotDeployed == true || string.IsNullOrWhiteSpace(Data.BotFrameworkName))
+                    return;
+                var id = await Deployer.DeployBot(Data.BotFrameworkName, Data.Id, botType: "coach", token);
+                if (id != null)
+                {
+                    Data.IsBotDeployed = true;
+                    await Save.Execute().GetAwaiter();
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, ex.Message);
+                await Alert.Handle(ex.Message).GetAwaiter();
+            }
         }
         protected async Task DoUploadThumbnail(byte[] data, CancellationToken token = default)
         {

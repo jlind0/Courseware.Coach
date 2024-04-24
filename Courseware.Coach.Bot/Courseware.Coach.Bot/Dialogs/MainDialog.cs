@@ -722,6 +722,22 @@ namespace Courseware.Coach.Bot.Dialogs
                         }
                         await stepContext.Context.SendActivityAsync(MessageFactory.Text($"Welcome {user.FirstName}!"), cancellationToken);
                     }
+                    if (Adapter.BotType == "coach")
+                    {
+                        if(Guid.TryParse(Adapter.Subject, out Guid rslt))
+                        {
+                            await LLM.StartConversationWithCoach(rslt, cancellationToken);
+                            return await stepContext.ReplaceDialogAsync(ChatWithCoach, null, cancellationToken);
+                        }
+                    }
+                    else if(Adapter.BotType == "course")
+                    {
+                        if(Guid.TryParse(Adapter.Subject, out Guid rslt))
+                        {
+                            await LLM.StartCourse(rslt, cancellationToken);
+                            return await stepContext.ReplaceDialogAsync(TakeLesson, null, cancellationToken);
+                        }
+                    }
                     // User is authenticated
                     return await stepContext.ReplaceDialogAsync(MainMenu, null, cancellationToken);
                 }

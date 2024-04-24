@@ -29,6 +29,8 @@ using MimeDetective;
 using MimeDetective.Storage;
 using System.Collections.Immutable;
 using Azure.Storage.Blobs;
+using Courseware.Coach.Azure.Management.Core;
+using Courseare.Coach.Azure.Management;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -91,6 +93,7 @@ builder.Services.AddScoped<IBusinessRepositoryFacade<User, UnitOfWork>, Business
 builder.Services.AddSingleton<ICloneAI, CloneAI>();
 builder.Services.AddSingleton<ITTS, TTS>();
 builder.Services.AddSingleton<ITranslationService, TranslationService>();
+builder.Services.AddSingleton<IBotFrameworkDeployer, BotFrameworkDeployer>();
 builder.Services.AddTransient<AlertView.AlertViewModel>();
 builder.Services.AddTransient<ClonesViewModel>();
 builder.Services.AddTransient<CoachesViewModel>();

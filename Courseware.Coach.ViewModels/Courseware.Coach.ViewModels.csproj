@@ -11,6 +11,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Courseware.Coach.Azure.Management.Core\Courseware.Coach.Azure.Management.Core.csproj" />
     <ProjectReference Include="..\Courseware.Coach.Business.Core\Courseware.Coach.Business.Core.csproj" />
     <ProjectReference Include="..\Courseware.Coach.Core\Courseware.Coach.Core.csproj" />
     <ProjectReference Include="..\Courseware.Coach.Data.Core\Courseware.Coach.Data.Core.csproj" />

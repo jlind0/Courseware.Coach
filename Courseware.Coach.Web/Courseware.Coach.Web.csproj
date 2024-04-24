@@ -9,6 +9,20 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Content Remove="bot_parameters.json" />
+    <Content Remove="bot_template.json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="bot_parameters.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Include="bot_template.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Invio.Extensions.Authentication.JwtBearer" Version="2.0.1" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.3" NoWarn="NU1605" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="8.0.3" NoWarn="NU1605" />
@@ -24,6 +38,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Courseare.Coach.Azure.Management\Courseare.Coach.Azure.Management.csproj" />
+    <ProjectReference Include="..\Courseware.Coach.Azure.Management.Core\Courseware.Coach.Azure.Management.Core.csproj" />
     <ProjectReference Include="..\Courseware.Coach.Business.Core\Courseware.Coach.Business.Core.csproj" />
     <ProjectReference Include="..\Courseware.Coach.Business\Courseware.Coach.Business.csproj" />
     <ProjectReference Include="..\Courseware.Coach.Core\Courseware.Coach.Core.csproj" />

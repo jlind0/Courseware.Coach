@@ -3,6 +3,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Bot.Builder;
 using Microsoft.Bot.Builder.Integration.AspNet.Core;
+using Microsoft.Extensions.Logging;
 using System.Threading.Tasks;
 
 namespace Courseware.Coach.Bot.Controllers
@@ -16,17 +17,23 @@ namespace Courseware.Coach.Bot.Controllers
     {
         private readonly IBotFrameworkHttpAdapter _adapter;
         private readonly IBot _bot;
-
-        public BotController(IBotFrameworkHttpAdapter adapter, IBot bot)
+        protected ILogger Logger { get; }
+        public BotController(IBotFrameworkHttpAdapter adapter, IBot bot, ILogger<BotController> logger)
         {
+            Logger = logger;
             _adapter = adapter;
             _bot = bot;
         }
 
         [HttpPost]
         [HttpGet]
-        public async Task PostAsync()
+        public async Task PostAsync([FromRoute]string? botType = null, [FromRoute]string? subject = null)
         {
+            if(_adapter is AdapterWithErrorHandler adapter)
+            {
+                adapter.BotType = botType;
+                adapter.Subject = subject;
+            }
             // Delegate the processing of the HTTP POST to the adapter.
             // The adapter will invoke the bot.
             await _adapter.ProcessAsync(Request, Response, _bot);
