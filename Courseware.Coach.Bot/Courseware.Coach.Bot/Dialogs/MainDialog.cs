@@ -601,7 +601,15 @@ namespace Courseware.Coach.Bot.Dialogs
         }
         private async Task<DialogTurnResult> DisplayCoachesStep(WaterfallStepContext stepContext, CancellationToken cancellationToken)
         {
+            var LLM = Factory.GetLLM(stepContext.Context.Activity.Conversation.Id);
             var coaches = await CoachRepository.Get(token: cancellationToken);
+            foreach(var item in coaches.Items.ToArray())
+            {
+                if(item.IsPublished != true && !await LLM.IsSubscribedToCoach(item.Id, cancellationToken))
+                {
+                    coaches.Items.Remove(item);
+                }
+            }
             if(coaches.Items.Count == 0)
             {
                 await stepContext.Context.SendActivityAsync(MessageFactory.Text("No coaches available."), cancellationToken);
@@ -617,7 +625,15 @@ namespace Courseware.Coach.Bot.Dialogs
         }
         private async Task<DialogTurnResult> DisplayCoursesStep(WaterfallStepContext stepContext, CancellationToken cancellationToken)
         {
+            var LLM = Factory.GetLLM(stepContext.Context.Activity.Conversation.Id);
             var coaches = await CourseRepository.Get(token: cancellationToken);
+            foreach (var item in coaches.Items.ToArray())
+            {
+                if (item.IsPublished != true && !await LLM.IsSubscribedToCourse(item.Id, cancellationToken))
+                {
+                    coaches.Items.Remove(item);
+                }
+            }
             if (coaches.Items.Count == 0)
             {
                 await stepContext.Context.SendActivityAsync(MessageFactory.Text("No courses available."), cancellationToken);
