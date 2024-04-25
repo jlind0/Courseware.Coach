@@ -91,6 +91,8 @@ namespace Courseware.Coach.Core
         public string? TopicUserPrompt { get; set; }
         public string? BotFrameworkName { get; set; }
         public bool? IsBotDeployed { get; set; }
+        public bool? EnableImageGeneration { get; set; }
+        public string? AzureSearchIndexName { get; set; }
     }
     public class PayoutAccount
     {

@@ -19,6 +19,8 @@
                 <FormItem Field="@nameof(CH.Price)" LabelText="Price" />
                 <FormItem Field="@nameof(CH.TopicSystemPrompt)" EditorType="FormEditorType.TextArea" LabelText="Topic System Prompt" />
                 <FormItem Field="@nameof(CH.TopicUserPrompt)" EditorType="FormEditorType.TextArea" LabelText="Topic User Prompt" />
+                <FormItem Field="@nameof(CH.EnableImageGeneration)" LabelText="Enable Image Generation"/>
+                <FormItem Field="@nameof(CH.AzureSearchIndexName)" LabelText="Search Index Name"/>
                 <FormItem Field="@nameof(CH.NativeLocale)" LabelText="Native Locale">
                     <Template>
                         <TelerikDropDownList @bind-Value="ViewModel.SelectedLocale"

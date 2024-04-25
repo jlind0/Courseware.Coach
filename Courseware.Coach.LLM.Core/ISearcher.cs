@@ -6,8 +6,8 @@ using System.Threading.Tasks;
 
 namespace Courseware.Coach.LLM.Core
 {
-    public interface IChatGPT
+    public interface ISearcher
     {
-        Task<string?> GetRepsonse(string systemPrompt, string userPrompt, int maxTokens = 22, CancellationToken token = default);
+        public Task<string[]> GetImages(string index, string query, CancellationToken token = default);
     }
 }

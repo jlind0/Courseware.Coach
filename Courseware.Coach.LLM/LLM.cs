@@ -100,7 +100,8 @@ namespace Courseware.Coach.LLM
         protected BroadcastBlock<byte[]> BrodcastAudioConversation { get; }
         protected ILookup<int, Lesson>? Lessons { get; set; }
         public ISourceBlock<byte[]> AudioConversation{ get => BrodcastAudioConversation; }
-
+        protected BroadcastBlock<string> BroadcastImageConversation { get; }
+        public ISourceBlock<string> ImageConversation { get => BroadcastImageConversation; }
         protected ICloneAI CloneAI { get; }
         protected ITTS TTS { get; }
         protected ITranslationService Translation { get; }
@@ -117,9 +118,10 @@ namespace Courseware.Coach.LLM
         }   
         protected bool IsVoiceEnabled { get; }
         protected IChatGPT ChatGPT { get; }
+        protected ISearcher Searcher { get; }
         public LLM(ICloneAI cloneAI, ITTS tts, ITranslationService translation, ISubscriptionManager subscriptionManager,
             IRepository<UnitOfWork, User> userRepo, IRepository<UnitOfWork, CH> coachRepo, 
-            IRepository<UnitOfWork, Course> courseRepo, IConfiguration config, ILogger<LLM> logger, IChatGPT chatGPT)
+            IRepository<UnitOfWork, Course> courseRepo, IConfiguration config, ILogger<LLM> logger, IChatGPT chatGPT, ISearcher searcher)
         {
             IsVoiceEnabled = bool.Parse(config["LLM:VoiceEnabled"] ?? "false");
             Logger = logger;
@@ -132,7 +134,9 @@ namespace Courseware.Coach.LLM
             CourseRepo = courseRepo;
             BrodcastConversation = new BroadcastBlock<CloneResponse>(null);
             BrodcastAudioConversation = new BroadcastBlock<byte[]>(null);
+            BroadcastImageConversation = new BroadcastBlock<string>(null);
             ChatGPT = chatGPT;
+            Searcher = searcher;
         }
 
         public async Task ChatWithCoach(string message, string? locale = null, CancellationToken token = default)
@@ -156,7 +160,22 @@ namespace Courseware.Coach.LLM
 
             }, token);
             if (resp != null)
+            {
                 await PushText(resp, CurrentCoach.NativeLocale, CurrentCoach.DefaultVoiceName, token);
+                if (CurrentCoach.EnableImageGeneration == true && CurrentCoach.AzureSearchIndexName != null)
+                {
+                    var topic = await ChatGPT.GetRepsonse("Extract topic from query. Limit results to the title of the topic only. Keep answers short.", resp.text, 22, token: token);
+                    Logger.LogInformation($"Topic: {topic}");
+                    if (!string.IsNullOrWhiteSpace(topic))
+                    {
+                        var imgs = await Searcher.GetImages(CurrentCoach.AzureSearchIndexName, topic, token);
+                        foreach (var img in imgs)
+                        {
+                            BroadcastImageConversation.Post(img);
+                        }
+                    }
+                }
+            }
         }
         protected ConcurrentDictionary<string, string?> DefaultVoice { get; } = new ConcurrentDictionary<string, string?>();
         protected async Task PushText(CloneResponse message, string locale, string? voiceName, CancellationToken token)
@@ -627,7 +646,7 @@ namespace Courseware.Coach.LLM
                 return;
             if(!string.IsNullOrWhiteSpace(CurrentCoach.TopicSystemPrompt) && !string.IsNullOrWhiteSpace(CurrentCoach.TopicUserPrompt))
             {
-                var topic = await ChatGPT.GetRepsonse(CurrentCoach.TopicSystemPrompt, CurrentCoach.TopicUserPrompt, token);
+                var topic = await ChatGPT.GetRepsonse(CurrentCoach.TopicSystemPrompt, CurrentCoach.TopicUserPrompt, token: token);
                 if(!string.IsNullOrWhiteSpace(topic))
                 {
 

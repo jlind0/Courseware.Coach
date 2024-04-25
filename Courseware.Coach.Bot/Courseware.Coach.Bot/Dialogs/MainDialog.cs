@@ -1,11 +1,13 @@
 ﻿// Generated with Bot Builder V4 SDK Template for Visual Studio CoreBot v4.22.0
 
+using AdaptiveCards;
 using Courseware.Coach.Bot;
 using Courseware.Coach.Core;
 using Courseware.Coach.Data;
 using Courseware.Coach.Data.Core;
 using Courseware.Coach.LLM;
 using Courseware.Coach.LLM.Core;
+using Courseware.Coach.Storage.Core;
 using Courseware.Coach.Subscriptions.Core;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Bot.Builder;
@@ -21,11 +23,13 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.Recognizers.Text.DataTypes.TimexExpression;
 using Microsoft.Recognizers.Text.NumberWithUnit.English;
 using Newtonsoft.Json.Linq;
+using Stripe;
 using System;
 using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
 using System.Net.Http;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -43,14 +47,16 @@ namespace Courseware.Coach.Bot.Dialogs
         {
             Provider = provider;
         }
-        public ILLM GetLLM(string id, ActionBlock<CloneResponse>? response = null)
+        public ILLM GetLLM(string id, ActionBlock<CloneResponse>? response = null, ActionBlock<string>? imageResponse = null)
         {
             if(LLMs.TryGetValue(id, out ILLM value))
                 return value;
             var llm = Provider.GetRequiredService<ILLM>();
             LLMs[id] = llm;
             if (response != null)
-                llm.Conversation.LinkTo(response); 
+                llm.Conversation.LinkTo(response);
+            if(imageResponse != null)
+                llm.ImageConversation.LinkTo(imageResponse);
             return llm;
         }
         public async Task DisconnectLLM(string id)
@@ -72,9 +78,10 @@ namespace Courseware.Coach.Bot.Dialogs
         protected LLMFactory Factory { get; }
         protected AdapterWithErrorHandler Adapter { get; }
         protected IRepository<UnitOfWork, Course> CourseRepository { get; }
+        protected IStorageBlob StorageBlob { get; }
         // Dependency injection uses this constructor to instantiate MainDialog
         public MainDialog(ILogger<MainDialog> logger, IConfiguration config, LLMFactory factory, 
-            IBotFrameworkHttpAdapter adapter, IRepository<UnitOfWork, CH> coachRepository, IRepository<UnitOfWork, Course> courseRepository)
+            IBotFrameworkHttpAdapter adapter, IRepository<UnitOfWork, CH> coachRepository, IRepository<UnitOfWork, Course> courseRepository, IStorageBlob storageBlob)
             : base(nameof(MainDialog))
         { 
             Logger = logger;
@@ -86,7 +93,7 @@ namespace Courseware.Coach.Bot.Dialogs
             CoachRepository = coachRepository;
             Adapter = (AdapterWithErrorHandler)adapter;
             ConnectionName = config["ConnectionName"];
-            
+            StorageBlob = storageBlob;
             AddDialog(new OAuthPrompt(
                 nameof(OAuthPrompt),
                 new OAuthPromptSettings
@@ -555,6 +562,35 @@ namespace Courseware.Coach.Bot.Dialogs
                     Logger.LogError(ex, ex.Message);
                 }
 
+            }), new ActionBlock<string>(async response =>
+            {
+                try
+                {
+                    var dataId = Guid.NewGuid();
+                    await StorageBlob.SetData(dataId.ToString(), Convert.FromBase64String(response));
+                    Logger.LogInformation($"DataId : {dataId}");
+                    var card = new AdaptiveCard(new AdaptiveSchemaVersion(1, 2))
+                    {
+                        Body = new List<AdaptiveElement>(){ new AdaptiveImage()
+                        {
+                            Url = new Uri($"https://courseware.coach/api/images/{dataId}"),
+                            Size = AdaptiveImageSize.Auto
+                        }}
+                    };
+                    var attach = new Attachment()
+                    {
+                        ContentType = "application/vnd.microsoft.card.adaptive",
+                        Content = card
+                    };
+                    await adapter.ContinueConversationAsync("7a754f6d-f4ef-43be-8cef-70971fbbc055", ConvRef, async (turnContext, token) =>
+                    {
+                        await turnContext.SendActivityAsync(MessageFactory.Attachment(attach), token);
+                    }, default);
+                }
+                catch(Exception ex)
+                {
+                    Logger.LogError(ex, ex.Message);
+                }
             }));
             await base.OnInitializeAsync(dc);
         }

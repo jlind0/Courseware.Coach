@@ -24,7 +24,7 @@ namespace Courseware.Coach.LLM
             Enpoint = config["ChatGPT:Endpoint"] ?? throw new InvalidDataException();
             Logger = logger;
         }
-        public async Task<string?> GetRepsonse(string systemPrompt, string userPrompt, CancellationToken token = default)
+        public async Task<string?> GetRepsonse(string systemPrompt, string userPrompt, int maxTokens = 22, CancellationToken token = default)
         {
             try
             {
@@ -35,7 +35,7 @@ namespace Courseware.Coach.LLM
                     // Build the request.
                     request.Method = HttpMethod.Post;
                     request.RequestUri = new Uri(Enpoint);
-                    var requestBody = $"{{\"model\": \"gpt-4-turbo\", \"messages\": [{{\"role\": \"system\", \"content\": \"{systemPrompt}\"}},{{\"role\": \"user\", \"content\": \"{userPrompt}\"}}], \"temperature\": 1.32, \"max_tokens\": 22, \"top_p\": 1, \"frequency_penalty\": 2, \"presence_penalty\": 0}}";
+                    var requestBody = $"{{\"model\": \"gpt-4-turbo\", \"messages\": [{{\"role\": \"system\", \"content\": \"{systemPrompt.ReplaceLineEndings("")}\"}},{{\"role\": \"user\", \"content\": \"{userPrompt.ReplaceLineEndings("")}\"}}], \"temperature\": 1.32, \"max_tokens\": {maxTokens}, \"top_p\": 1, \"frequency_penalty\": 2, \"presence_penalty\": 0}}";
                     Logger.LogInformation(requestBody);
                     request.Content = new StringContent(requestBody, Encoding.UTF8, "application/json");
                     request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", ApiKey);
@@ -47,7 +47,9 @@ namespace Courseware.Coach.LLM
                     string result = await response.Content.ReadAsStringAsync();
                     Logger.LogInformation(result);
                     JObject jsonResponse = JObject.Parse(result);
-                    return jsonResponse["choices"][0]["message"]["content"].ToString();
+                    var reply = jsonResponse["choices"][0]["message"]["content"].ToString();
+                    Logger.LogInformation(reply);
+                    return reply;
                 }
             }
             catch(Exception ex)

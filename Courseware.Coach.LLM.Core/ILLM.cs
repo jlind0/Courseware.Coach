@@ -51,6 +51,7 @@ namespace Courseware.Coach.LLM.Core
         Task<bool> IsSubscribedToCourse(Guid courseId, CancellationToken token = default);
         Task<bool> Logout(CancellationToken token = default);
         Task SuggestNewTopic(CancellationToken token = default);
+        ISourceBlock<string> ImageConversation { get; }
     }
     
 }
