@@ -52,10 +52,20 @@
         </TelerikForm>
         @if (!(ViewModel.Data.IsBotDeployed == true))
         {
+
+                <h3>Deploy Bot</h3>
              <TelerikTextBox @bind-Value="ViewModel.Data.BotFrameworkName"/>
              <TelerikButton OnClick="ViewModel.DeployBot.BindCommand<MouseEventArgs>()">Deploy</TelerikButton>
         }
-       
+        <h4>Add Twitter Account</h4>
+        <TelerikTextBox @bind-Value="ViewModel.TwitterAccount"/>
+        <TelerikButton OnClick="ViewModel.AddTwitter.BindCommand<MouseEventArgs>()">Add</TelerikButton>
+        <ul>
+            @foreach (var account in ViewModel.Data.TwitterAccounts)
+            {
+                <li>@account.AccountName</li>
+            }
+        </ul>
         <h4>Upload Thumbnail Image</h4>
         <InputFile OnChange="ViewModel.UploadThumbnail.BindUploadBuiltInCommand(this)" accept=".jpg,.jpeg,.png,.gif,.bmp,.tiff,.svg,.webp" />
         @if (!string.IsNullOrEmpty(ViewModel.Data.ThumbnailImageId))

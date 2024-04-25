@@ -66,6 +66,11 @@ namespace Courseware.Coach.Core
         string? StripePriceId { get; set; }
         string? StripeUrl { get; set; }
     }
+    public class TwitterAccount
+    {
+        [Required]
+        public string AccountName { get; set; } = null!;
+    }
     public class Coach : Item, IPriced
     {
         [Required]
@@ -93,6 +98,7 @@ namespace Courseware.Coach.Core
         public bool? IsBotDeployed { get; set; }
         public bool? EnableImageGeneration { get; set; }
         public string? AzureSearchIndexName { get; set; }
+        public List<TwitterAccount> TwitterAccounts { get; set; } = [];
     }
     public class PayoutAccount
     {

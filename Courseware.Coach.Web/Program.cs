@@ -31,9 +31,9 @@ using System.Collections.Immutable;
 using Azure.Storage.Blobs;
 using Courseware.Coach.Azure.Management.Core;
 using Courseare.Coach.Azure.Management;
+using Microsoft.AspNetCore.Mvc.Formatters;
 
 var builder = WebApplication.CreateBuilder(args);
-
 // Add services to the container.
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearerQueryStringAuthentication()
     .AddMicrosoftIdentityWebApi(builder.Configuration)
@@ -94,6 +94,7 @@ builder.Services.AddSingleton<ICloneAI, CloneAI>();
 builder.Services.AddSingleton<ITTS, TTS>();
 builder.Services.AddSingleton<ITranslationService, TranslationService>();
 builder.Services.AddSingleton<IBotFrameworkDeployer, BotFrameworkDeployer>();
+builder.Services.AddSingleton<ITwitter, Twitter>();
 builder.Services.AddTransient<AlertView.AlertViewModel>();
 builder.Services.AddTransient<ClonesViewModel>();
 builder.Services.AddTransient<CoachesViewModel>();

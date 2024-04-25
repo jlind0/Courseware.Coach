@@ -168,6 +168,7 @@ namespace Courseware.Coach.ViewModels
         protected IStorageBlob Storage { get; }
         public ReactiveCommand<byte[], Unit> UploadThumbnail { get; }
         public ReactiveCommand<byte[], Unit> UploadBanner { get; }
+        public ReactiveCommand<Unit, Unit> AddTwitter { get; }
         protected IBotFrameworkDeployer Deployer { get; }
         public CoachViewModel(Guid id, IStorageBlob storage, IBusinessRepositoryFacade<CH, UnitOfWork> coachRepository, ITTS tts, ILogger logger, IBotFrameworkDeployer deployer)
         {
@@ -185,6 +186,7 @@ namespace Courseware.Coach.ViewModels
             RemoveInstance = ReactiveCommand.CreateFromTask<Guid>(DoRemoveInstance);
             UploadThumbnail = ReactiveCommand.CreateFromTask<byte[]>(DoUploadThumbnail);
             UploadBanner = ReactiveCommand.CreateFromTask<byte[]>(DoUploadBanner);
+            AddTwitter = ReactiveCommand.CreateFromTask(DoAddTwitter);
             this.WhenPropertyChanged(p => p.SelectedLocale).Subscribe(
                 async p =>
                 {
@@ -202,6 +204,28 @@ namespace Courseware.Coach.ViewModels
                         await Alert.Handle(ex.Message).GetAwaiter();
                     }
                 }).DisposeWith(disposables);
+        }
+        private string? twitterAccount;
+        public string? TwitterAccount
+        {
+            get => twitterAccount;
+            set => this.RaiseAndSetIfChanged(ref twitterAccount, value);
+        }
+        protected async Task DoAddTwitter(CancellationToken token = default)
+        {
+            try
+            {
+                if (Data == null || string.IsNullOrWhiteSpace(TwitterAccount))
+                    return;
+                Data.TwitterAccounts.Add(new TwitterAccount { AccountName = TwitterAccount });
+                await Save.Execute().GetAwaiter();
+                TwitterAccount = null;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, ex.Message);
+                await Alert.Handle(ex.Message).GetAwaiter();
+            }
         }
         protected async Task DoBotDeploy(CancellationToken token = default)
         {
