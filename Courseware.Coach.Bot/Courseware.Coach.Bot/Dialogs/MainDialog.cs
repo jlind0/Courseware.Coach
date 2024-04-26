@@ -10,12 +10,14 @@ using Courseware.Coach.LLM.Core;
 using Courseware.Coach.Storage.Core;
 using Courseware.Coach.Subscriptions.Core;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Azure.Cosmos.Serialization.HybridRow;
 using Microsoft.Bot.Builder;
 using Microsoft.Bot.Builder.Dialogs;
 using Microsoft.Bot.Builder.Dialogs.Choices;
 using Microsoft.Bot.Builder.Integration.AspNet.Core;
 using Microsoft.Bot.Connector.Authentication;
 using Microsoft.Bot.Schema;
+using Microsoft.Bot.Schema.Teams;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -162,6 +164,16 @@ namespace Courseware.Coach.Bot.Dialogs
                 StartQuiz,
                 AnswerQuizQuestion
             };
+            var coachTrial = new WaterfallStep[]
+            {
+                StartCoachTrial,
+                HandleCoachTrial
+            };
+            var courseTrial = new WaterfallStep[]
+            {
+                StartCourseTrial,
+                HandCourseTrial
+            };
             AddDialog(new WaterfallDialog(LoginPickCoach, waterfallSteps));
             AddDialog(new WaterfallDialog(ChatWithCoach, coachSteps));
             AddDialog(new WaterfallDialog(MainMenu, mainMenuSteps));
@@ -174,6 +186,8 @@ namespace Courseware.Coach.Bot.Dialogs
             AddDialog(new WaterfallDialog(SubscribeToCoach, subscribeToCoach));
             AddDialog(new WaterfallDialog(SubscribeToCourse, subscribeToCourse));
             AddDialog(new WaterfallDialog(TakeQuiz, takeQuiz));
+            AddDialog(new WaterfallDialog(CoachTrial, coachTrial));
+            AddDialog(new WaterfallDialog(CourseTrial, courseTrial));
             AddDialog(new TextPrompt(nameof(TextPrompt)));
             AddDialog(new ChoicePrompt(nameof(ChoicePrompt)));
             AddDialog(new ConfirmPrompt(nameof(ConfirmPrompt)));
@@ -192,6 +206,86 @@ namespace Courseware.Coach.Bot.Dialogs
         protected const string SubscribeToCoach = nameof(SubscribeToCoach);
         protected const string SubscribeToCourse = nameof(SubscribeToCourse);
         protected const string TakeQuiz = nameof(TakeQuiz);
+        protected const string CoachTrial = nameof(CoachTrial);
+        protected const string CourseTrial = nameof(CourseTrial);
+        private async Task<DialogTurnResult> StartCoachTrial(WaterfallStepContext stepContext, CancellationToken token)
+        {
+            var options = new PromptOptions
+            {
+                Prompt = MessageFactory.Text("Would you like to start a trial with this coach?"),
+
+            };
+            stepContext.Values["coachId"] = (Guid)stepContext.Options;
+            return await stepContext.PromptAsync(nameof(ConfirmPrompt), options , token);
+        }
+        private async Task<DialogTurnResult> HandleCoachTrial(WaterfallStepContext stepContext, CancellationToken token)
+        {
+            bool startTrial = (bool)stepContext.Result;
+            Guid coachId = Guid.Parse((string)stepContext.Values["coachId"]);
+            if (startTrial)
+            {
+                var LLM = Factory.GetLLM(stepContext.Context.Activity.Conversation.Id);
+                await LLM.TrialCoach(coachId, token);
+                if (await LLM.IsSubscribedToCoach(LLM.CurrentSubscription.CoachId.Value, token))
+                {
+                    CancellationTokenSource cts = new CancellationTokenSource();
+                    // Start a task that sends typing activity every few seconds
+                    var typingTask = RepeatTypingIndicatorAsync(stepContext.Context, cts.Token);
+                    try
+                    {
+                        await LLM.StartConversationWithCoach(LLM.CurrentSubscription.CoachId.Value, token);
+                    }
+                    finally
+                    {
+                        cts.Cancel();
+                        await typingTask;
+                    }
+                    return await stepContext.ReplaceDialogAsync(ChatWithCoach, null, token);
+                }
+                else
+                    return await stepContext.ReplaceDialogAsync(MainMenu, null, token);
+            }
+            return await stepContext.ReplaceDialogAsync(SubscribeToCoach, coachId, token);
+        }
+        private async Task<DialogTurnResult> StartCourseTrial(WaterfallStepContext stepContext, CancellationToken token)
+        {
+            var options = new PromptOptions
+            {
+                Prompt = MessageFactory.Text("Would you like to start a trial with this course?"),
+
+            };
+            stepContext.Values["courseId"] = (Guid)stepContext.Options;
+            return await stepContext.PromptAsync(nameof(ConfirmPrompt), options, token);
+        }
+        private async Task<DialogTurnResult> HandCourseTrial(WaterfallStepContext stepContext, CancellationToken token)
+        {
+            bool startTrial = (bool)stepContext.Result;
+            Guid coachId = Guid.Parse((string)stepContext.Values["courseId"]);
+            if (startTrial)
+            {
+                var LLM = Factory.GetLLM(stepContext.Context.Activity.Conversation.Id);
+                await LLM.TrialCourse(coachId, token);
+                if (await LLM.IsSubscribedToCourse(LLM.CurrentSubscription.CoachId.Value, token))
+                {
+                    CancellationTokenSource cts = new CancellationTokenSource();
+                    // Start a task that sends typing activity every few seconds
+                    var typingTask = RepeatTypingIndicatorAsync(stepContext.Context, cts.Token);
+                    try
+                    {
+                        await LLM.StartCourse(LLM.CurrentSubscription.CourseId.Value, token);
+                    }
+                    finally
+                    {
+                        cts.Cancel();
+                        await typingTask;
+                    }
+                    return await stepContext.ReplaceDialogAsync(TakeLesson, null, token);
+                }
+                else
+                    return await stepContext.ReplaceDialogAsync(MainMenu, null, token);
+            }
+            return await stepContext.ReplaceDialogAsync(SubscribeToCourse, coachId, token);
+        }
         private async Task<DialogTurnResult> StartSubscriptionToCoach(WaterfallStepContext stepContext, CancellationToken token)
         {
             var coachId = (Guid)stepContext.Options;
@@ -684,12 +778,15 @@ namespace Courseware.Coach.Bot.Dialogs
             if (!LLM.IsLoggedIn)
             {
                 await stepContext.Context.SendActivityAsync(MessageFactory.Text("Not logged in."), cancellationToken);
-                return await stepContext.EndDialogAsync(null, cancellationToken);
+                return await stepContext.ReplaceDialogAsync(LoginPickCoach, null, cancellationToken);
             }
             var coach = coaches.Items.Single();
             if (!await LLM.IsSubscribedToCoach(coach.Id, cancellationToken))
             {
-                return await stepContext.ReplaceDialogAsync(SubscribeToCoach, coach.Id , cancellationToken);
+                if (await LLM.IsEligbleToTrialCoach(coach.Id, cancellationToken))
+                    return await stepContext.ReplaceDialogAsync(CoachTrial, coach.Id, cancellationToken);
+                else
+                    return await stepContext.ReplaceDialogAsync(SubscribeToCoach, coach.Id, cancellationToken);
             }
             CancellationTokenSource cts = new CancellationTokenSource();
             // Start a task that sends typing activity every few seconds
@@ -730,7 +827,10 @@ namespace Courseware.Coach.Bot.Dialogs
             var coach = coaches.Items.Single();
             if (!await LLM.IsSubscribedToCourse(coach.Id, cancellationToken))
             {
-                return await stepContext.ReplaceDialogAsync(SubscribeToCourse, coach.Id, cancellationToken);
+                if (await LLM.IsEligbleToTrialCourse(coach.Id, cancellationToken))
+                    return await stepContext.ReplaceDialogAsync(CourseTrial, coach.Id, cancellationToken);
+                else
+                    return await stepContext.ReplaceDialogAsync(SubscribeToCourse, coach.Id, cancellationToken);
             }
             CancellationTokenSource cts = new CancellationTokenSource();
             // Start a task that sends typing activity every few seconds

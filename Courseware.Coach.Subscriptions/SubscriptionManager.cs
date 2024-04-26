@@ -300,6 +300,7 @@ namespace Courseware.Coach.Subscriptions
                 }
                 sub.Price = total;
                 sub.IsFunded = true;
+                sub.IsTrial = false;
                 sub.StartDate = DateTime.UtcNow;
                 sub.EndDate = DateTime.UtcNow.AddDays(daysToComplete ?? 30);
                 await UserRepo.Update(user, uow, token);
@@ -314,7 +315,7 @@ namespace Courseware.Coach.Subscriptions
             if (users.Count > 0)
             {
                 foreach (var sub in users.Items.Single().Subscriptions.Where(
-                    s => s.CourseId == courseId && s.IsFunded).OrderByDescending(s => s.EndDate))
+                    s => s.CourseId == courseId && (s.IsFunded || s.IsTrial == true)).OrderByDescending(s => s.EndDate))
                 {
                     if (sub.StartDate == null && sub.EndDate == null)
                         return sub;
@@ -334,7 +335,7 @@ namespace Courseware.Coach.Subscriptions
             {
                 var user = users.Items.Single();
                 foreach (var sub in user.Subscriptions.Where(
-                    s => s.CoachId == coachId && s.IsFunded).OrderByDescending(s => s.EndDate))
+                    s => s.CoachId == coachId && (s.IsFunded || s.IsTrial == true)).OrderByDescending(s => s.EndDate))
                 {
                     if (sub.StartDate == null && sub.EndDate == null)
                         return sub;
@@ -405,6 +406,96 @@ namespace Courseware.Coach.Subscriptions
             var sub = user.Subscriptions.Single(s => s.Id == subscriptionId);
             sub.IsFunded = false;
             await UserRepo.Update(user, token: token);
+        }
+
+        public async Task<Sub?> StartCourseTrial(Guid courseId, string objectId, CancellationToken token = default)
+        {
+            if(await IsCourseTrialEligble(courseId, objectId, token))
+            {
+                var users = await UserRepo.Get(filter: u => u.ObjectId == objectId, token: token);
+                var user = users.Items.Single();
+                var course = await CourseRepo.Get(courseId, token: token);
+                if(course == null)
+                    throw new ArgumentException("Course not found");
+                Sub sub = new Sub()
+                {
+                    CourseId = course.Id,
+                    IsTrial = true,
+                    StartDate = DateTime.UtcNow,
+                    EndDate = DateTime.UtcNow.AddDays(1)
+                };
+                user.Subscriptions.Add(sub);
+                await UserRepo.Update(user, token: token);
+                return sub;
+            }
+            return null;
+        }
+
+        public async Task<Sub?> StartCoachTrial(Guid coachId, string objectId, CancellationToken token = default)
+        {
+            if(await IsCoachTrialEligble(coachId, objectId, token))
+            {
+                var users = await UserRepo.Get(filter: u => u.ObjectId == objectId, token: token);
+                var user = users.Items.Single();
+                var coach = await CoachRepo.Get(coachId, token: token);
+                if(coach == null)
+                    throw new ArgumentException("Coach not found");
+                Sub sub = new Sub()
+                {
+                    CoachId = coachId,
+                    IsTrial = true,
+                    StartDate = DateTime.UtcNow,
+                    EndDate = DateTime.UtcNow.AddMinutes(coach.DurationOfTrialInMinutes ?? 180)
+                };
+                user.Subscriptions.Add(sub);
+                await UserRepo.Update(user, token: token);
+                return sub;
+            }
+            return null;
+        }
+
+        public async Task<bool> IsCourseTrialEligble(Guid courseId, string objectId, CancellationToken token = default)
+        {
+            var users = await UserRepo.Get(filter: u => u.ObjectId == objectId, token: token);
+            var user = users.Items.Single();
+            if (user.Roles.Any(r => r == "Admin" || r == $"Admin:Course:{courseId}"))
+            {
+                return false;
+            }
+            var course = await CourseRepo.Get(courseId, token: token);
+            if (course == null)
+            {
+                throw new ArgumentException("Course not found");
+            }
+            if (course.IsTrialEligible == false)
+            {
+                return false;
+            }
+            if (user.Subscriptions.Any(s => s.CourseId == courseId && (s.IsTrial == true || s.IsFunded)))
+                return false;
+            return true;
+        }
+
+        public async Task<bool> IsCoachTrialEligble(Guid coachId, string objectId, CancellationToken token = default)
+        {
+            var users = await UserRepo.Get(filter: u => u.ObjectId == objectId, token: token);
+            var user = users.Items.Single();
+            if (user.Roles.Any(r => r == "Admin" || r == $"Admin:Coach:{coachId}"))
+            {
+                return false;
+            }
+            var coach = await CoachRepo.Get(coachId, token: token);
+            if (coach == null)
+            {
+                throw new ArgumentException("Coach not found");
+            }
+            if (coach.IsTrialEligible == false)
+            {
+                return false;
+            }
+            if (user.Subscriptions.Any(s => s.CoachId == coachId && (s.IsTrial == true || s.IsFunded)))
+                return false;
+            return true;
         }
     }
 }

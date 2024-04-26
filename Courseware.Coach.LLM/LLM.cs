@@ -320,7 +320,7 @@ namespace Courseware.Coach.LLM
             CurrentQuizQuestion = null;
             if (CurrentCourse == null)
                 throw new InvalidOperationException("Course not started");
-            if (CurrentLesson == null)
+            if (CurrentLesson == null || CurrentSubscription?.IsTrial == true)
             {
                 CurrentLesson = CurrentCourse.Lessons.OrderBy(l => l.Order).FirstOrDefault();
                 CurrentQuiz = CurrentLesson?.Quiz;
@@ -657,6 +657,42 @@ namespace Courseware.Coach.LLM
                         await ChatWithCoach(topic, "en-US", token);
                 }
             }
+        }
+
+        public async Task<Subscription?> TrialCoach(Guid coachId, CancellationToken token = default)
+        {
+            if(await IsEligbleToTrialCoach(coachId, token))
+            {
+                Reset();
+                CurrentSubscription = await SubscriptionManager.StartCoachTrial(coachId, CurrentUser!.ObjectId, token);
+                return CurrentSubscription;
+            }
+            return null;
+        }
+
+        public async Task<Subscription?> TrialCourse(Guid courseId, CancellationToken token = default)
+        {
+            if(await IsEligbleToTrialCourse(courseId, token))
+            {
+                Reset();
+                CurrentSubscription = await SubscriptionManager.StartCourseTrial(courseId, CurrentUser!.ObjectId, token);
+                return CurrentSubscription;
+            }
+            return null;
+        }
+
+        public Task<bool> IsEligbleToTrialCoach(Guid coachId, CancellationToken token = default)
+        {
+            if(!IsLoggedIn)
+                throw new InvalidOperationException("No user logged in");
+            return SubscriptionManager.IsCoachTrialEligble(coachId, CurrentUser!.ObjectId, token);
+        }
+
+        public Task<bool> IsEligbleToTrialCourse(Guid courseId, CancellationToken token = default)
+        {
+            if(!IsLoggedIn)
+                throw new InvalidOperationException("No user logged in");
+            return SubscriptionManager.IsCourseTrialEligble(courseId, CurrentUser!.ObjectId, token);
         }
     }
 }

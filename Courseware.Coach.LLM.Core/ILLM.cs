@@ -38,6 +38,10 @@ namespace Courseware.Coach.LLM.Core
         Task<CoachInstance?> StartConversationWithCoachInstance(Guid coachId, CancellationToken token = default);
         Task<Subscription?> SubscribeToCoach(Guid coachId, CancellationToken token = default);
         Task<Subscription?> SubscribeToCourse(Guid courseId, CancellationToken token = default);
+        Task<Subscription?> TrialCoach(Guid coachId, CancellationToken token = default);
+        Task<Subscription?> TrialCourse(Guid courseId, CancellationToken token = default);
+        Task<bool> IsEligbleToTrialCoach(Guid coachId, CancellationToken token = default);
+        Task<bool> IsEligbleToTrialCourse(Guid courseId, CancellationToken token = default);
         Task ChatWithCoach(string message, string? locale = null, CancellationToken token = default);
         Task ChatWithCoachInstance(string message, string? locale = null, CancellationToken token = default);
         Task EndConversation(CancellationToken token = default);

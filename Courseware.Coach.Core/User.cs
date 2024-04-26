@@ -99,6 +99,8 @@ namespace Courseware.Coach.Core
         public bool? EnableImageGeneration { get; set; }
         public string? AzureSearchIndexName { get; set; }
         public List<TwitterAccount> TwitterAccounts { get; set; } = [];
+        public bool? IsTrialEligible { get; set; } = false;
+        public int? DurationOfTrialInMinutes { get; set; } = 180;
     }
     public class PayoutAccount
     {
@@ -155,6 +157,7 @@ namespace Courseware.Coach.Core
         public string? BannerImageId { get; set; }
         public string? BotFrameworkName { get; set; }
         public bool? IsBotDeployed { get; set; }
+        public bool? IsTrialEligible { get; set; } = false;
     }
     public class Lesson
     {
@@ -243,5 +246,6 @@ namespace Courseware.Coach.Core
         public List<RecurringPayment> Payments { get; set; } = [];
         public bool IsPaidOut { get; set; } = false;
         public List<QuizAnswer> Answers { get; set; } = [];
+        public bool? IsTrial { get; set; } = false;
     }
 }

@@ -11,11 +11,15 @@ namespace Courseware.Coach.Subscriptions.Core
     {
         Task<Subscription?> StartSubscribeToCourse(Guid courseId, string objectId, CancellationToken token = default);
         Task<Subscription?> StartSubscribeToCoach(Guid coachId, string objectId, CancellationToken token = default);
+        Task<Subscription?> StartCourseTrial(Guid courseId, string objectId, CancellationToken token = default);
+        Task<Subscription?> StartCoachTrial(Guid coachId, string objectId, CancellationToken token = default);
         Task<Subscription?> FinishSubscription(Guid subscriptionId, string objectId, decimal total, CancellationToken token = default);
         Task<Subscription?> UpdateSubscription(Subscription subscription, string objectId, CancellationToken token = default);
         Task CancelSubscription(Guid subscriptionId, string objectId, CancellationToken token = default);
         Task<bool> IsSubscribedToCourse(Guid courseId, string objectId, CancellationToken token = default);
         Task<bool> IsSubscribedToCoach(Guid coachId, string objectId, CancellationToken token = default);
+        Task<bool> IsCourseTrialEligble(Guid courseId, string objectId, CancellationToken token = default);
+        Task<bool> IsCoachTrialEligble(Guid coachId, string objectId, CancellationToken token = default);
         Task<Subscription?> GetCurrentSubscriptionForCourse(Guid courseId, string objectId, CancellationToken token = default);
         Task<Subscription?> GetCurrentSubscriptionForCoach(Guid coachId, string objectId, CancellationToken token = default);
         Task SetPriceForCourse(Guid courseId, decimal price, CancellationToken token = default);

@@ -21,6 +21,8 @@
                 <FormItem Field="@nameof(CH.TopicUserPrompt)" EditorType="FormEditorType.TextArea" LabelText="Topic User Prompt" />
                 <FormItem Field="@nameof(CH.EnableImageGeneration)" LabelText="Enable Image Generation"/>
                 <FormItem Field="@nameof(CH.AzureSearchIndexName)" LabelText="Search Index Name"/>
+                <FormItem Field="@nameof(CH.IsTrialEligible)" LabelText="Is Trial Eligible"/>
+                <FormItem Field="@nameof(CH.DurationOfTrialInMinutes)" LabelText="Duration of Trial in Minutes"/>
                 <FormItem Field="@nameof(CH.NativeLocale)" LabelText="Native Locale">
                     <Template>
                         <TelerikDropDownList @bind-Value="ViewModel.SelectedLocale"
