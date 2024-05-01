@@ -31,9 +31,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Courseware.Coach.Storage.Co
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Courseware.Coach.Storage", "Courseware.Coach.Storage\Courseware.Coach.Storage.csproj", "{F49A1671-0EC1-4EAF-97C1-7D19FC1AA65B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Courseware.Coach.Azure.Management.Core", "Courseware.Coach.Azure.Management.Core\Courseware.Coach.Azure.Management.Core.csproj", "{A7C7FD75-E8F5-4EDB-AF36-EA2A8573D2E9}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Courseware.Coach.Azure.Management.Core", "Courseware.Coach.Azure.Management.Core\Courseware.Coach.Azure.Management.Core.csproj", "{A7C7FD75-E8F5-4EDB-AF36-EA2A8573D2E9}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Courseare.Coach.Azure.Management", "Courseare.Coach.Azure.Management\Courseare.Coach.Azure.Management.csproj", "{5E8C2C0D-F295-48EF-AB70-1AE69DE03548}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Courseare.Coach.Azure.Management", "Courseare.Coach.Azure.Management\Courseare.Coach.Azure.Management.csproj", "{5E8C2C0D-F295-48EF-AB70-1AE69DE03548}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

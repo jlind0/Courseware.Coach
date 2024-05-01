@@ -90,6 +90,7 @@ builder.Services.AddSingleton<ISubscriptionManager, SubscriptionManager>();
 builder.Services.AddScoped<IBusinessRepositoryFacade<Course, UnitOfWork>, CourseFacade>();
 builder.Services.AddScoped<IBusinessRepositoryFacade<Coach, UnitOfWork>, CoachFacade>();
 builder.Services.AddScoped<IBusinessRepositoryFacade<User, UnitOfWork>, BusinessRepositoryFacade<User, UnitOfWork>>();
+builder.Services.AddSingleton<ITinyURL, TinyUrl>();
 builder.Services.AddSingleton<ICloneAI, CloneAI>();
 builder.Services.AddSingleton<ITTS, TTS>();
 builder.Services.AddSingleton<ITranslationService, TranslationService>();

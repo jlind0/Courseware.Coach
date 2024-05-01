@@ -19,16 +19,19 @@ namespace Courseware.Coach.LLM
             ApiKey = config["Twitter:ApiKey"] ?? throw new InvalidDataException();
             ApiUrl = config["Twitter:ApiUrl"] ?? throw new InvalidDataException();
         }
-        public async Task<TwitterItem[]> GetTweets(string userId, int count = 100, DateTime? startDate = null, CancellationToken token = default)
+        public async Task<TwitterItem[]> GetTweets(string[] userIds, int count = 500, DateTime? startDate = null, CancellationToken token = default)
         {
+            
             List<TwitterItem> items = new List<TwitterItem>();
+            if(userIds.Length == 0)
+                return items.ToArray(); 
             string? nextToken = null;
             do
             {
                 using (HttpClient client = new HttpClient())
                 {
                     client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ApiKey);
-                    string url = $"{ApiUrl}tweets/search/recent?query=from:{userId}&max_results={count}&tweet.fields=id,text,created_at";
+                    string url = $"{ApiUrl}tweets/search/recent?query=({Uri.EscapeDataString(string.Join(" OR ", userIds.Select(v => $"from:{v}")))})&max_results=100&tweet.fields=id,text,created_at,author_id";
                     if (startDate != null)
                         url += $"&start_time={startDate.Value.ToString("yyyy-MM-ddTHH:mm:ssZ")}";
                     if(nextToken != null)
@@ -43,6 +46,20 @@ namespace Courseware.Coach.LLM
             } while (items.Count < count && nextToken != null);
             return items.ToArray();
         }
+
+        public async Task<string?> GetAccountNameForId(string id, CancellationToken token = default)
+        {
+            using(HttpClient client = new HttpClient())
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ApiKey);
+                HttpResponseMessage response = await client.GetAsync($"{ApiUrl}users/{id}", token);
+                response.EnsureSuccessStatusCode();
+                string json = await response.Content.ReadAsStringAsync();
+                dynamic resp = JsonConvert.DeserializeObject(json);
+                return resp.data.username;
+            }
+        }
+
         public class TwitterResponse
         {
             public List<TwitterItem> data { get; } = [];

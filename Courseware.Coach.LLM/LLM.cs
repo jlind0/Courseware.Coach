@@ -162,7 +162,7 @@ namespace Courseware.Coach.LLM
             if (resp != null)
             {
                 await PushText(resp, CurrentCoach.NativeLocale, CurrentCoach.DefaultVoiceName, token);
-                if (CurrentCoach.EnableImageGeneration == true && CurrentCoach.AzureSearchIndexName != null)
+                if (CurrentCourse == null && CurrentCoach.EnableImageGeneration == true && CurrentCoach.AzureSearchIndexName != null)
                 {
                     var topic = await ChatGPT.GetRepsonse("Extract topic from query. Limit results to the title of the topic only. Keep answers short.", resp.text, 22, token: token);
                     Logger.LogInformation($"Topic: {topic}");
@@ -376,7 +376,7 @@ namespace Courseware.Coach.LLM
                 throw new InvalidOperationException("No conversation started");
             if(CurrentCoach == null)
                 throw new InvalidOperationException("No coach started");
-            message = $"{CurrentPrompt.Text} {message}";
+            message = $"You asked this question: '{CurrentPrompt.Text}'. The student answered: '{message}'";
             if (CurrentCoachInstance == null)
                 await ChatWithCoach(message, token: token);
             else
