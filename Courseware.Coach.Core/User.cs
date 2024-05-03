@@ -101,6 +101,7 @@ namespace Courseware.Coach.Core
         public List<TwitterAccount> TwitterAccounts { get; set; } = [];
         public bool? IsTrialEligible { get; set; } = false;
         public int? DurationOfTrialInMinutes { get; set; } = 180;
+        public List<Quote> Quotes { get; set; } = [];
     }
     public class PayoutAccount
     {
@@ -177,6 +178,7 @@ namespace Courseware.Coach.Core
         public string Author { get; set; } = null!;
         [Required]
         public string Text { get; set; } = null!;
+        public int Order { get; set; } = 0;
     }
     public class Quiz
     {
@@ -247,5 +249,8 @@ namespace Courseware.Coach.Core
         public bool IsPaidOut { get; set; } = false;
         public List<QuizAnswer> Answers { get; set; } = [];
         public bool? IsTrial { get; set; } = false;
+        public bool? IsSubscribedToSMSAlerts { get; set; } = false;
+        public bool? IsSubscribedToEmailAlerts { get; set; } = false;
+        public int? LastQuoteOrder { get; set; }
     }
 }

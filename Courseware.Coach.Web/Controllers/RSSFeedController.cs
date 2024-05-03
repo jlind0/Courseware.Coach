@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
 using System.Collections.Concurrent;
+using System.IO.Compression;
 using System.Runtime.Serialization;
 using System.ServiceModel.Syndication;
 using System.Text;
@@ -29,14 +30,33 @@ namespace Courseware.Coach.Web.Controllers
             Twitter = twitter;
             TinyUrl = tinyUrl;
         }
-        [HttpGet("render-base64/{base64}/data.asp")]
+        [HttpGet("render-base64/{base64}")]
         public async Task<ActionResult<string>> RenderBase64String(string base64)
         {
-            string data = Encoding.UTF8.GetString(Convert.FromBase64String(base64));
+            string data = Encoding.UTF8.GetString(await DecompressBytes(Convert.FromBase64String(Uri.UnescapeDataString(base64))));
             string html = $"<!DOCTYPE html><html><head><title>Base64 Encoded Data</title></head><body><pre>{data}</pre></body></html>";
             return Content(html, "text/html", Encoding.UTF8);
         }
-
+        private async static Task<byte[]> CompressBytes(byte[] data)
+        {
+            using (var compressedStream = new MemoryStream())
+            using (var zipStream = new GZipStream(compressedStream, CompressionMode.Compress))
+            {
+                await zipStream.WriteAsync(data, 0, data.Length);
+                zipStream.Close();
+                return compressedStream.ToArray();
+            }
+        }
+        private static async Task<byte[]> DecompressBytes(byte[] data)
+        {
+            using (var compressedStream = new MemoryStream(data))
+            using (var zipStream = new GZipStream(compressedStream, CompressionMode.Decompress))
+            using (var resultStream = new MemoryStream())
+            {
+                await zipStream.CopyToAsync(resultStream);
+                return resultStream.ToArray();
+            }
+        }
         [HttpGet("coaches/{id:guid}")]
         public async Task<IActionResult> GetFeedForCoach(Guid id, CancellationToken token = default)
         {
@@ -64,12 +84,13 @@ namespace Courseware.Coach.Web.Controllers
                             if(accountNames.TryGetValue(tweet.author_id, out string? authorName))
                                 item.Authors.Add(new SyndicationPerson() { Name = authorName ?? "" });
                             item.PublishDate = DateTime.Parse(tweet.created_at);
-                            var i = Convert.ToBase64String(Encoding.UTF8.GetBytes($"@{accountNames[tweet.author_id]} at {item.PublishDate.UtcDateTime.ToShortDateString()} => {item.Summary.Text}"));
-                            item.Links.Add(new SyndicationLink(new Uri(await TinyUrl.GetTinyUrl($"https://courseware.coach/api/rssfeed/render-base64/{i}/data.asp") ?? throw new InvalidDataException())));
+                            /*var i = Convert.ToBase64String(await CompressBytes(Encoding.UTF8.GetBytes($"@{accountNames[tweet.author_id]} at {item.PublishDate.UtcDateTime.ToShortDateString()} => {item.Summary.Text}")));
+                            item.Links.Add(new SyndicationLink(new Uri(await TinyUrl.GetTinyUrl($"https://courseware.coach/api/rssfeed/render-base64/{Uri.EscapeDataString(i)}") ?? throw new InvalidDataException())));*/
+                            item.Links.Add(new SyndicationLink(new Uri($"https://twitter.com/{accountNames[tweet.author_id]}/status/{tweet.id}")));
                             items.Add(item);
                         });
                 }
-                feed.Items = items.ToArray();
+                feed.Items = items.OrderByDescending(i => i.PublishDate).ToArray();
                 var formatter = new Rss20FeedFormatter(feed);
                 using (var stringWriter = new StringWriter())
                 {
