@@ -6,12 +6,14 @@ using Microsoft.VisualBasic;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using System.Threading.Tasks.Dataflow;
 
 namespace Courseware.Coach.LLM
 {
@@ -26,6 +28,7 @@ namespace Courseware.Coach.LLM
         }
         public async Task<CloneResponse?> GenerateResponse(string apiKey, ConversationRequestBody body, CancellationToken token = default)
         {
+            body.stream = false;
             string route = "/clone/generate_response";
             var requestBody = JsonConvert.SerializeObject(body);
             using (var client = new HttpClient())
@@ -148,6 +151,87 @@ namespace Courseware.Coach.LLM
                 // Read response as a string.
                 response.EnsureSuccessStatusCode();
             }
+        }
+
+        public ISourceBlock<string> GenerateResponseStream(string apiKey, ConversationRequestBody body, CancellationToken token = default)
+        {
+            string route = "/clone/generate_response";
+            var url = BaseUri + route;
+            body.stream = true;
+            // Validate request body
+            var context = new ValidationContext(body, serviceProvider: null, items: null);
+            var validationResults = new List<ValidationResult>();
+            if (!Validator.TryValidateObject(body, context, validationResults, true))
+            {
+                throw new ValidationException("Request body contains invalid data");
+            }
+
+            string jsonParameters = JsonConvert.SerializeObject(body);
+
+            var broadcastBlock = new BroadcastBlock<string>(null);
+
+            _= Task.Run(async () =>
+            {
+                using (var httpClient = new HttpClient())
+                {
+                    httpClient.DefaultRequestHeaders.Add("x-api-key", apiKey);
+                    var content = new StringContent(jsonParameters, System.Text.Encoding.UTF8, "application/json");
+
+                    try
+                    {
+                        using (var response = await httpClient.PostAsync(url, content))
+                        {
+                            if (response.IsSuccessStatusCode)
+                            {
+                                var stream = await response.Content.ReadAsStreamAsync();
+                                using (var reader = new System.IO.StreamReader(stream))
+                                {
+                                    string? line;
+                                    string resp = "";
+                                    while ((line = await reader.ReadLineAsync()) != null)
+                                    {                                        
+                                        if (line.StartsWith("data:"))
+                                        {
+                                            var event_data = line.Substring(5);
+                                            var eventObj = JsonConvert.DeserializeObject<Dictionary<string, string>>(event_data);
+                                            var currentToken = eventObj["current_token"];
+
+                                            if (currentToken == "[DONE]")
+                                            {
+                                                if (!string.IsNullOrWhiteSpace(resp))
+                                                    broadcastBlock.Post(resp);
+                                                broadcastBlock.Complete();
+                                                break;
+                                            }
+                                            else if (currentToken.Contains("\n\n") || currentToken.Contains('?'))
+                                            {
+                                                resp += currentToken.Replace("\n", "");
+                                                Logger.LogInformation(resp);
+                                                broadcastBlock.Post(resp);
+                                                resp = "";
+                                            }
+                                            else
+                                            {
+                                                resp += currentToken;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                broadcastBlock.Complete();
+                            }
+                        }
+                    }
+                    catch (Exception)
+                    {
+                        broadcastBlock.Complete();
+                    }
+                }
+            });
+
+            return broadcastBlock;
         }
     }
 }

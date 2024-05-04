@@ -12,6 +12,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Reflection.Metadata.Ecma335;
 using System.Text;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
@@ -153,29 +154,46 @@ namespace Courseware.Coach.LLM
             {
                 message = await Translation.Translate(message, effectiveLocale, CurrentCoach.NativeLocale, token);
             }
-            var resp = await CloneAI.GenerateResponse(CurrentCoach.APIKey, new ConversationRequestBody()
+            ConcurrentDictionary<string, string> dict = new ConcurrentDictionary<string, string>();
+            ConcurrentDictionary<string, string> topics = new ConcurrentDictionary<string, string>();
+            ActionBlock<string> rcv = new ActionBlock<string>(async str =>
+            {
+                await PushText(new CloneResponse()
+                {
+                    text = str
+                }, CurrentCoach.NativeLocale, CurrentCoach.DefaultVoiceName, token);
+                if (CurrentCourse == null && CurrentCoach.EnableImageGeneration == true && CurrentCoach.AzureSearchIndexName != null)
+                {
+                    var topic = await ChatGPT.GetRepsonse("Extract topic from query. Limit results to the title of the topic only. Keep answers short.", str, 22, token: token);
+                    Logger.LogInformation($"Topic: {topic}");
+                    if (!string.IsNullOrWhiteSpace(topic))
+                    {
+                        if (topics.ContainsKey(topic))
+                            return;
+                        topics.TryAdd(topic, topic);
+                        var imgs = await Searcher.GetImages(CurrentCoach.AzureSearchIndexName, topic, token);
+                        foreach (var img in imgs)
+                        {
+                            if(dict.ContainsKey(img))
+                            {
+                                continue;
+                            }
+                            dict.TryAdd(img, topic);
+                            BroadcastImageConversation.Post(img);
+                        }
+                    }
+                }
+            });
+            var blk = CloneAI.GenerateResponseStream(CurrentCoach.APIKey, new ConversationRequestBody()
             {
                 conversation_id = CurrentConversationId,
                 user_message = message
 
             }, token);
-            if (resp != null)
-            {
-                await PushText(resp, CurrentCoach.NativeLocale, CurrentCoach.DefaultVoiceName, token);
-                if (CurrentCourse == null && CurrentCoach.EnableImageGeneration == true && CurrentCoach.AzureSearchIndexName != null)
-                {
-                    var topic = await ChatGPT.GetRepsonse("Extract topic from query. Limit results to the title of the topic only. Keep answers short.", resp.text, 22, token: token);
-                    Logger.LogInformation($"Topic: {topic}");
-                    if (!string.IsNullOrWhiteSpace(topic))
-                    {
-                        var imgs = await Searcher.GetImages(CurrentCoach.AzureSearchIndexName, topic, token);
-                        foreach (var img in imgs)
-                        {
-                            BroadcastImageConversation.Post(img);
-                        }
-                    }
-                }
-            }
+            blk.LinkTo(rcv, new DataflowLinkOptions { PropagateCompletion = true });
+            await blk.Completion;
+            rcv.Complete();
+            await rcv.Completion;
         }
         protected ConcurrentDictionary<string, string?> DefaultVoice { get; } = new ConcurrentDictionary<string, string?>();
         protected async Task PushText(CloneResponse message, string locale, string? voiceName, CancellationToken token)

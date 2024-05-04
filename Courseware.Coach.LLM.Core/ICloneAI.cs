@@ -4,6 +4,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Threading.Tasks.Dataflow;
 
 namespace Courseware.Coach.LLM.Core
 {
@@ -33,9 +34,10 @@ namespace Courseware.Coach.LLM.Core
     public class ConversationRequestBody
     {
         [Required]
-        public string conversation_id { get; set; }
+        public string conversation_id { get; set; } = null!;
         [Required]
         public string user_message { get; set; } = null!;
+        public bool stream { get; set; } = false;
     }
     public class CloneResponseWrapper
     {
@@ -79,5 +81,6 @@ namespace Courseware.Coach.LLM.Core
         Task<ConversationHistory?> GetHistory(string apiKey, string conversationId, CancellationToken token = default);
         Task<CloneResponse?> GenerateResponse(string apiKey, ConversationRequestBody body, CancellationToken token = default);
         Task<Clone?> GetClone(string apiKey, string slug, CancellationToken token = default);
+        ISourceBlock<string> GenerateResponseStream(string apiKey, ConversationRequestBody body, CancellationToken token = default);
     }
 }
