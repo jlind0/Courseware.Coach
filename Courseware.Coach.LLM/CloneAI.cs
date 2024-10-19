@@ -53,20 +53,28 @@ namespace Courseware.Coach.LLM
 
         public async Task<Clone?> GetClone(string apiKey, string slug, CancellationToken token = default)
         {
-            string route = $"/clone/?slug={slug}";
-            using (var client = new HttpClient())
-            using (var request = new HttpRequestMessage())
+            try
             {
-                // Build the request.
-                request.Method = HttpMethod.Get;
-                request.RequestUri = new Uri(BaseUri + route);
-                request.Headers.Add("x-api-key", apiKey);
-                
-                // Send the request and get response.
-                HttpResponseMessage response = await client.SendAsync(request, token);
-                // Read response as a string.
-                response.EnsureSuccessStatusCode();
-                return (await response.Content.ReadFromJsonAsync<CloneBody>(token))?.clone;
+                string route = $"/clone/?slug={slug}";
+                using (var client = new HttpClient())
+                using (var request = new HttpRequestMessage())
+                {
+                    // Build the request.
+                    request.Method = HttpMethod.Get;
+                    request.RequestUri = new Uri(BaseUri + route);
+                    request.Headers.Add("x-api-key", apiKey);
+
+                    // Send the request and get response.
+                    HttpResponseMessage response = await client.SendAsync(request, token);
+                    // Read response as a string.
+                    response.EnsureSuccessStatusCode();
+                    return (await response.Content.ReadFromJsonAsync<CloneBody>(token))?.clone;
+                }
+            }
+            catch(Exception ex)
+            {
+                Logger.LogError(ex, ex.Message);
+                return null;
             }
         }
 

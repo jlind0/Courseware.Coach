@@ -47,25 +47,41 @@ namespace Courseware.Coach.Subscriptions
         }
         public async Task<bool> IsSubscribedToCoach(Guid coachId, string objectId, CancellationToken token = default)
         {
+            var sub = await GetCurrentSubscriptionForCoach(coachId, objectId, token);
             var users = await UserRepo.Get(filter: u => u.ObjectId == objectId, token: token);
-            var user = users.Items.SingleOrDefault();
-            if(user != null && user.Roles.Any(r => r == "Admin" || r == $"Admin:Coach:{coachId}"))
+            var user = users.Items.Single();
+            if (IsUserAdminOfCourse(coachId, user) && sub == null)
             {
-                return true;
+                sub = new Sub()
+                {
+                    CoachId = coachId,
+                    IsFunded = true,
+                    IsTrial = false
+                };
+                user.Subscriptions.Add(sub);
+                await UserRepo.Update(user, token: token);
             }
-              
-            return (await GetCurrentSubscriptionForCoach(coachId, objectId, token)) != null;
+
+            return sub != null;
         }
 
         public async Task<bool> IsSubscribedToCourse(Guid courseId, string objectId, CancellationToken token = default)
         {
+            var sub = await GetCurrentSubscriptionForCourse(courseId, objectId, token);
             var users = await UserRepo.Get(filter: u => u.ObjectId == objectId, token: token);
-            var user = users.Items.SingleOrDefault();
-            if (user != null && user.Roles.Any(r => r == "Admin" || r == $"Admin:Course:{courseId}"))
+            var user = users.Items.Single();
+            if (IsUserAdminOfCourse(courseId, user) && sub == null)
             {
-                return true;
+                sub = new Sub()
+                {
+                    CourseId = courseId,
+                    IsFunded = true,
+                    IsTrial = false
+                };
+                user.Subscriptions.Add(sub);
+                await UserRepo.Update(user, token: token);
             }
-            return (await GetCurrentSubscriptionForCourse(courseId, objectId, token)) != null;
+            return sub != null;
         }
         protected async Task CreateProduct(IPriced entity, bool isSubscription = false, CancellationToken token = default)
         {
@@ -454,11 +470,15 @@ namespace Courseware.Coach.Subscriptions
             return null;
         }
 
+        protected bool IsUserAdminOfCourse(Guid courseId, User user)
+        {
+            return user.Roles.Any(r => r == "Admin" || r == $"Admin:Course:{courseId}");
+        }
         public async Task<bool> IsCourseTrialEligble(Guid courseId, string objectId, CancellationToken token = default)
         {
             var users = await UserRepo.Get(filter: u => u.ObjectId == objectId, token: token);
             var user = users.Items.Single();
-            if (user.Roles.Any(r => r == "Admin" || r == $"Admin:Course:{courseId}"))
+            if (IsUserAdminOfCourse(courseId, user))
             {
                 return false;
             }
@@ -475,12 +495,15 @@ namespace Courseware.Coach.Subscriptions
                 return false;
             return true;
         }
-
+        protected bool IsUserAdminOfCoach(Guid coachId, User user)
+        {
+            return user.Roles.Any(r => r == "Admin" || r == $"Admin:Coach:{coachId}");
+        }
         public async Task<bool> IsCoachTrialEligble(Guid coachId, string objectId, CancellationToken token = default)
         {
             var users = await UserRepo.Get(filter: u => u.ObjectId == objectId, token: token);
             var user = users.Items.Single();
-            if (user.Roles.Any(r => r == "Admin" || r == $"Admin:Coach:{coachId}"))
+            if (IsUserAdminOfCoach(coachId, user))
             {
                 return false;
             }
